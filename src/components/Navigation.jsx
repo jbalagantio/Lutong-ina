@@ -14,7 +14,7 @@ const Navigation = ({ activeScreen, onNavigate }) => {
             <button
               type="button"
               aria-current={activeScreen === item.id ? 'page' : undefined}
-              onClick={() => onNavigate(item.id)}
+              onClick={(event) => onNavigate(item.id, event.currentTarget)}
             >
               {item.label}
             </button>

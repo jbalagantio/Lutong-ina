@@ -11,6 +11,8 @@ import {
   mergeLibraryEntries,
   mergeRecoveredPersonalRecipes,
   preparePersonalRecipe,
+  recordLibraryChange,
+  recoverLibraryEntries,
   removeLibraryEntry,
   saveBuiltInRecipe,
   saveMyDishes,
@@ -336,4 +338,83 @@ test('recovery keeps saved and remapped personal metadata separate and combines 
     { recipeId: replacementId, isFavorite: true, isFamiliar: false },
   ])
   assert.equal(session[1].recipeId, example.id)
+})
+
+test('read recovery respects explicit false independently of untouched preferences', () => {
+  const saved = [
+    { recipeId: 'chicken-adobo', isFavorite: true, isFamiliar: true },
+    { recipeId: 'pork-adobo', isFavorite: true, isFamiliar: true },
+  ]
+  const savedInSession = recordLibraryChange(new Map(), 'chicken-adobo', { isSaved: true })
+  assert.deepEqual(recoverLibraryEntries(saved, savedInSession, new Map()), saved)
+
+  let changes = recordLibraryChange(savedInSession, 'chicken-adobo', { isFavorite: true })
+  changes = recordLibraryChange(changes, 'chicken-adobo', { isFavorite: false })
+  assert.deepEqual(recoverLibraryEntries(saved, changes, new Map()), [
+    { ...saved[0], isFavorite: false },
+    saved[1],
+  ])
+  changes = recordLibraryChange(changes, 'pork-adobo', { isFamiliar: false })
+  assert.deepEqual(recoverLibraryEntries(saved, changes, new Map()), [
+    { ...saved[0], isFavorite: false },
+    { ...saved[1], isFamiliar: false },
+  ])
+  assert.deepEqual(savedInSession.get('chicken-adobo'), { isSaved: true })
+})
+
+test('read recovery honors removal and resets preferences when saving the recipe again', () => {
+  let changes = recordLibraryChange(new Map(), 'chicken-adobo', { isSaved: true })
+  changes = recordLibraryChange(changes, 'chicken-adobo', { isFamiliar: true })
+  const removed = recordLibraryChange(changes, 'chicken-adobo', { isSaved: false })
+  assert.deepEqual(recoverLibraryEntries(libraryEntries, removed, new Map()), [])
+
+  const savedAgain = recordLibraryChange(removed, 'chicken-adobo', { isSaved: true })
+  assert.deepEqual(recoverLibraryEntries(libraryEntries, savedAgain, new Map()), [
+    { recipeId: 'chicken-adobo', isFavorite: false, isFamiliar: false },
+  ])
+  const favorited = recordLibraryChange(savedAgain, 'chicken-adobo', { isFavorite: true })
+  assert.deepEqual(recoverLibraryEntries(libraryEntries, favorited, new Map()), libraryEntries)
+})
+
+test('explicit personal preferences follow the remapped session ID, leaving the saved owner intact', (context) => {
+  const replacementId = webcrypto.randomUUID()
+  context.mock.method(globalThis.crypto, 'randomUUID', () => replacementId)
+  const sessionRecipe = { ...example, name: 'Session recipe' }
+  const recoveredRecipes = mergeRecoveredPersonalRecipes([example], [sessionRecipe])
+  const remappedRecipes = new Map([[example.id, recoveredRecipes[1]]])
+  const saved = [...libraryEntries, { recipeId: example.id, isFavorite: true, isFamiliar: true }]
+  let changes = recordLibraryChange(new Map(), example.id, { isFavorite: true, isFamiliar: true })
+  changes = recordLibraryChange(changes, example.id, { isFavorite: false })
+
+  assert.deepEqual(recoverLibraryEntries(saved, changes, remappedRecipes), [
+    ...saved,
+    { recipeId: replacementId, isFavorite: false, isFamiliar: true },
+  ])
+})
+
+test('pending changes survive repeated read failures and still require replacement for partial storage', (context) => {
+  const original = JSON.stringify({ personalRecipes: [example], libraryEntries: [...libraryEntries, null] })
+  let stored = original
+  let blocked = true
+  const setItem = context.mock.fn((storageKey, value) => {
+    assert.equal(storageKey, key)
+    stored = value
+  })
+  installStorage(context, { getItem: () => {
+    if (blocked) throw new DOMException('Blocked', 'SecurityError')
+    return stored
+  }, setItem })
+  const changes = recordLibraryChange(new Map(), 'chicken-adobo', { isFavorite: false })
+  assert.equal(loadMyDishes().storageStatus, 'read-failed')
+  assert.equal(loadMyDishes().storageStatus, 'read-failed')
+  blocked = false
+  const loaded = loadMyDishes()
+  const library = recoverLibraryEntries(loaded.libraryEntries, changes, new Map())
+  const recovered = { ...loaded, libraryEntries: library }
+  assert.deepEqual(library, [{ ...libraryEntries[0], isFavorite: false }])
+  assert.equal(saveMyDishes(recovered), 'partial')
+  assert.equal(setItem.mock.callCount(), 0)
+  assert.equal(stored, original)
+  assert.equal(saveMyDishes({ ...recovered, storageStatus: 'ready' }), 'ready')
+  assert.deepEqual(JSON.parse(stored), { personalRecipes: [example], libraryEntries: library })
 })

@@ -95,7 +95,7 @@ export const mergeLibraryEntries = (savedEntries, sessionEntries, remappedRecipe
   for (const entry of [...savedEntries, ...remappedEntries]) {
     const existing = entriesById.get(entry.recipeId)
     if (existing) {
-      // Retain enabled preferences from either copy after a storage outage.
+      // Duplicate stored records have no reliable ordering for their preferences.
       entriesById.set(entry.recipeId, {
         ...existing,
         isFavorite: existing.isFavorite || entry.isFavorite,
@@ -104,6 +104,37 @@ export const mergeLibraryEntries = (savedEntries, sessionEntries, remappedRecipe
     } else {
       entriesById.set(entry.recipeId, entry)
     }
+  }
+  return [...entriesById.values()]
+}
+
+export const recordLibraryChange = (changes, recipeId, change) => {
+  const previous = changes.get(recipeId)
+  let nextChange = { ...previous, ...change }
+  if (change.isSaved === false) {
+    nextChange = { isSaved: false }
+  } else if (change.isSaved === true && previous?.isSaved === false) {
+    // Saving again starts fresh after explicitly removing the old entry.
+    nextChange = { isSaved: true, isFavorite: false, isFamiliar: false }
+  }
+  return new Map(changes).set(recipeId, nextChange)
+}
+
+export const recoverLibraryEntries = (savedEntries, changes, remappedRecipes) => {
+  const entriesById = new Map(savedEntries.map((entry) => [entry.recipeId, entry]))
+  for (const [originalId, change] of changes) {
+    const recipeId = remappedRecipes.get(originalId)?.id ?? originalId
+    if (change.isSaved === false) {
+      entriesById.delete(recipeId)
+      continue
+    }
+
+    const saved = entriesById.get(recipeId)
+    entriesById.set(recipeId, {
+      recipeId,
+      isFavorite: change.isFavorite ?? saved?.isFavorite ?? false,
+      isFamiliar: change.isFamiliar ?? saved?.isFamiliar ?? false,
+    })
   }
   return [...entriesById.values()]
 }

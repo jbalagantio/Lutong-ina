@@ -14,6 +14,8 @@ const storageWarnings = {
 }
 
 const MyDishes = ({
+  canDiscardDraft,
+  onDraftChange,
   personalRecipes,
   libraryEntries,
   storageStatus,
@@ -35,7 +37,6 @@ const MyDishes = ({
   const filterSelect = useRef(null)
   const formTrigger = useRef(null)
   const nextEditorKey = useRef(0)
-  const draftChanged = useRef(false)
   const searchTerm = normalizeRecipeName(search)
   const catalogTerm = normalizeRecipeName(catalogSearch)
   const collection = getRecipeCollection(personalRecipes, libraryEntries)
@@ -46,8 +47,6 @@ const MyDishes = ({
   const hasNameConflict = hasDuplicateRecipeNames(personalRecipes)
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
 
-  const canDiscardDraft = () => !draftChanged.current || window.confirm('Discard unsaved recipe changes?')
-
   const openEditor = (event, recipe) => {
     if (editor && editor.recipe === recipe) {
       return
@@ -55,7 +54,7 @@ const MyDishes = ({
     if (!canDiscardDraft()) {
       return
     }
-    draftChanged.current = false
+    onDraftChange(false)
     setIsBrowsing(false)
     formTrigger.current = event.currentTarget
     const key = nextEditorKey.current
@@ -71,7 +70,7 @@ const MyDishes = ({
       addButton.current?.focus()
     }
     formTrigger.current = null
-    draftChanged.current = false
+    onDraftChange(false)
   }
 
   const handleToggleBrowse = () => {
@@ -80,7 +79,7 @@ const MyDishes = ({
     }
     setEditor(null)
     formTrigger.current = null
-    draftChanged.current = false
+    onDraftChange(false)
     setExpandedId(null)
     setIsBrowsing(!isBrowsing)
   }
@@ -189,7 +188,7 @@ const MyDishes = ({
           recipe={editor.recipe}
           onSave={handleSave}
           onCancel={() => closeEditor()}
-          onDraftChange={() => { draftChanged.current = true }}
+          onDraftChange={() => onDraftChange(true)}
         />
       )}
       <div className="pantry-fields dishes-filters">

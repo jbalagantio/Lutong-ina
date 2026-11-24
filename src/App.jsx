@@ -10,9 +10,10 @@ import {
   deletePersonalRecipe,
   hasDuplicateRecipeNames,
   loadMyDishes,
-  mergeLibraryEntries,
   mergeRecoveredPersonalRecipes,
   preparePersonalRecipe,
+  recordLibraryChange,
+  recoverLibraryEntries,
   removeLibraryEntry,
   saveBuiltInRecipe,
   saveMyDishes,
@@ -43,6 +44,8 @@ const App = () => {
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const latestPantry = useRef(pantry)
   const latestDishes = useRef(myDishes)
+  const pendingLibraryChanges = useRef(new Map())
+  const recipeDraftChanged = useRef(false)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
 
@@ -176,6 +179,7 @@ const App = () => {
     if (next === current) {
       return false
     }
+    pendingLibraryChanges.current.delete(recipe.id)
     saveAndCommitMyDishes(next)
     return true
   }
@@ -192,6 +196,11 @@ const App = () => {
     const libraryEntries = shouldSave
       ? saveBuiltInRecipe(current.libraryEntries, recipeId)
       : removeLibraryEntry(current.libraryEntries, recipeId)
+    if (current.storageStatus === 'read-failed') {
+      pendingLibraryChanges.current = recordLibraryChange(
+        pendingLibraryChanges.current, recipeId, { isSaved: shouldSave },
+      )
+    }
     saveAndCommitMyDishes({ ...current, libraryEntries })
   }
 
@@ -203,6 +212,15 @@ const App = () => {
       return
     }
     const libraryEntries = toggleRecipePreference(current.libraryEntries, recipe.id, preference)
+    if (libraryEntries === current.libraryEntries) {
+      return
+    }
+    if (current.storageStatus === 'read-failed') {
+      const updatedEntry = libraryEntries.find((entry) => entry.recipeId === recipe.id)
+      pendingLibraryChanges.current = recordLibraryChange(
+        pendingLibraryChanges.current, recipe.id, { [preference]: updatedEntry[preference] },
+      )
+    }
     saveAndCommitMyDishes({ ...current, libraryEntries })
   }
 
@@ -217,7 +235,8 @@ const App = () => {
     if (recovered.storageStatus === 'read-failed') {
       return
     }
-    if (current.personalRecipes.length === 0 && current.libraryEntries.length === 0) {
+    const changes = pendingLibraryChanges.current
+    if (current.personalRecipes.length === 0 && changes.size === 0) {
       commitMyDishes(recovered)
       return { status: recovered.storageStatus, remappedRecipes: new Map() }
     }
@@ -231,8 +250,9 @@ const App = () => {
         remappedRecipes.set(recipe.id, mergedRecipe)
       }
     })
-    const libraryEntries = mergeLibraryEntries(recovered.libraryEntries, current.libraryEntries, remappedRecipes)
+    const libraryEntries = recoverLibraryEntries(recovered.libraryEntries, changes, remappedRecipes)
     const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries })
+    pendingLibraryChanges.current = new Map()
     return { status, remappedRecipes }
   }
 
@@ -255,7 +275,21 @@ const App = () => {
     return storageStatus === 'ready'
   }
 
-  const handleNavigate = (screen) => {
+  const canDiscardRecipeDraft = () =>
+    !recipeDraftChanged.current || window.confirm('Discard unsaved recipe changes?')
+
+  const handleRecipeDraftChange = (isDirty) => {
+    recipeDraftChanged.current = isDirty
+  }
+
+  const handleNavigate = (screen, trigger) => {
+    if (activeScreen === 'my-dishes' && screen !== activeScreen) {
+      if (!canDiscardRecipeDraft()) {
+        trigger?.focus()
+        return
+      }
+      recipeDraftChanged.current = false
+    }
     if (screen === 'home') {
       const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
       setRecommendationSession((session) => (
@@ -281,6 +315,8 @@ const App = () => {
   if (activeScreen === 'my-dishes') {
     screen = (
       <MyDishes
+        canDiscardDraft={canDiscardRecipeDraft}
+        onDraftChange={handleRecipeDraftChange}
         personalRecipes={myDishes.personalRecipes}
         libraryEntries={myDishes.libraryEntries}
         storageStatus={myDishes.storageStatus}

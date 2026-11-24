@@ -17,7 +17,7 @@ Run `npm run lint` to check the source and `npm run build` to create the product
 
 Use **My Dishes** to create, search, expand, edit, and delete personal recipes. **Browse recipes** lets you save dishes from the built-in catalog. The collection combines both sources and supports name search and filters. Favorite and Familiar are independent choices and start off for every recipe.
 
-My Dishes uses separate browser storage from Pantry. Library entries store recipe IDs and preferences. Removing a saved recipe or deleting a personal one removes its preferences. During recovery, a preference enabled in either recovered or in-memory data stays enabled. If a personal recipe ID is reassigned, its in-memory preferences follow the new ID. Replacing unreadable or partially recovered storage requires confirmation.
+My Dishes uses separate browser storage from Pantry. Library entries store recipe IDs and preferences. Removing a saved recipe or deleting a personal one removes its preferences. After a storage read failure, explicit session changes take precedence, including turning off a preference or removing a recipe. Untouched preferences are recovered from storage. Removing and saving the same recipe again starts its preferences fresh. If a personal recipe ID is reassigned, its session preferences follow the new ID. Duplicate entries already in storage retain enabled flags from either copy and require replacement confirmation along with other partially recovered data.
 
 Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty.
 
