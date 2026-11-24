@@ -21,7 +21,11 @@ My Dishes uses separate browser storage from Pantry. Library entries store recip
 
 Personal recipe photos are optional. Choose a JPEG, PNG, or WebP up to 10 MB. Photos stay in this browser in IndexedDB. Recipe details and library preferences stay in localStorage. Built-in photos load from Wikimedia Commons and fall back to a placeholder when unavailable. Unused photo cleanup requires Web Locks, valid saved recipe data, and a single open Lutong Ina tab. When cleanup is deferred, the app keeps the photo files. See [photo credits](IMAGE_CREDITS.md).
 
-Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty.
+Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty. **Ingredients** is the default view. Switching to **Grocery List** and back keeps the current ingredient filters and any open draft while Pantry stays mounted.
+
+**Grocery List** starts empty and displays saved items by purchase status. Its browser storage key is `lutong-ina-grocery-list`. The app reads the list without writing on startup. If a read fails, retry loading. If data is invalid or partly recoverable, replacement requires confirmation and keeps the recoverable items. Manual item changes, purchase toggling, and recipe-driven additions are deferred.
+
+Future grocery mutations must update the App-owned list and use the protected save utility with the current storage status. Only the confirmed replacement flow may authorize writing over invalid or partially recovered data.
 
 Choose one of three cooking modes on **Home**:
 

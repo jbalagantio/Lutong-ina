@@ -20,6 +20,7 @@ import {
   toggleRecipePreference,
 } from './utils/myDishes.js'
 import { reconcileRecipePhotos, saveRecipePhoto } from './utils/recipePhotos.js'
+import { loadGroceryList, saveGroceryList } from './utils/groceryList.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -50,6 +51,7 @@ const getDishesMatches = (ingredients, dishes) => {
 const App = ({ canReconcilePhotos }) => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [pantry, setPantry] = useState(loadPantry)
+  const [groceryList, setGroceryList] = useState(loadGroceryList)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const mainContent = useRef(null)
@@ -143,6 +145,34 @@ const App = ({ canReconcilePhotos }) => {
     if (currentStatus === 'ready' || (previousStatus === 'read-failed' && replaceNeeded)) {
       mainContent.current?.querySelector('h1')?.focus()
     }
+  }
+
+  const handleRetryGroceryList = () => {
+    if (groceryList.storageStatus === 'read-failed') {
+      const recoveredList = loadGroceryList()
+      setGroceryList(recoveredList)
+      return recoveredList.storageStatus
+    }
+
+    const storageStatus = saveGroceryList(groceryList)
+    setGroceryList({ ...groceryList, storageStatus })
+    return storageStatus
+  }
+
+  const handleReplaceGroceryList = () => {
+    const { items, storageStatus } = groceryList
+    if (storageStatus !== 'invalid' && storageStatus !== 'partial') return false
+    if (!window.confirm('Replace the saved grocery list with the items currently shown? Unreadable entries will be lost.')) {
+      return false
+    }
+
+    const result = saveGroceryList({ items, storageStatus: 'ready' })
+    if (result === 'ready') {
+      setGroceryList({ items, storageStatus: result })
+    } else {
+      setGroceryList({ ...groceryList, replacementError: result })
+    }
+    return result === 'ready'
   }
 
   const handleAddIngredient = (values) => {
@@ -422,6 +452,9 @@ const App = ({ canReconcilePhotos }) => {
         onEditIngredient={handleEditIngredient}
         onRemoveIngredient={handleRemoveIngredient}
         onToggleAvailability={handleToggleAvailability}
+        groceryList={groceryList}
+        onRetryGroceryList={handleRetryGroceryList}
+        onReplaceGroceryList={handleReplaceGroceryList}
       />
     )
   } else if (activeScreen === 'discover') {
