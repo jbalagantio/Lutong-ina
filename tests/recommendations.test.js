@@ -5,9 +5,13 @@ import {
   compareRecipeIngredients,
   getAvailableIngredientNames,
   getEligibleRecommendations,
+  getRecommendationCatalog,
   getRecipeMatches,
+  getSomethingNewPool,
   rankPantryRecommendations,
+  reconcileRecipeIds,
   refreshPantryRound,
+  refreshRecommendationRound,
   selectCookingMode,
   selectNextRecommendation,
 } from '../src/utils/recommendations.js'
@@ -248,4 +252,106 @@ test('pantry handles zero and one eligible dish and accepts newly eligible unsee
     assert.equal(end.rounds.pantry.currentId, 'soup')
     assert.equal(advanceRecommendationSession(end, expanded, 0.99, true).rounds.pantry.currentId, 'omelette')
   }
+})
+
+test('the combined catalog preserves IDs and same-name versions, with one copy of saved built-ins', () => {
+  const builtIn = [makeRecipe('Adobo', ['Garlic', 'Chicken'], 30)]
+  const personal = [{ ...makeRecipe('Adobo', ['Bawang', 'Tubig', 'Garlic'], 45), id: 'personal-adobo' }]
+  const original = structuredClone({ builtIn, personal })
+  const catalog = getRecommendationCatalog(builtIn, personal)
+  const library = [{ recipeId: 'adobo', isFavorite: true, isFamiliar: true }]
+  assert.deepEqual(catalog.map((recipe) => recipe.id), ['adobo', 'personal-adobo'])
+  const pantry = available('Bawang', 'Tubig')
+  const matches = getRecipeMatches(catalog, pantry)
+
+  assert.deepEqual(getEligibleRecommendations('pantry', matches, library).map((match) => match.recipe.id), [
+    'personal-adobo', 'adobo',
+  ])
+  assert.equal(matches[1].trackedCount, 1)
+  assert.equal(matches[1].matchPercentage, 100)
+  const shopping = getRecipeMatches(catalog, [])
+  assert.deepEqual(getEligibleRecommendations('shopping', shopping, library).map((match) => match.recipe.id), [
+    'adobo', 'personal-adobo',
+  ])
+  assert.equal(selectCookingMode(newSession(), 'shopping', shopping, 0.99, library).rounds.shopping.currentId, 'personal-adobo')
+  assert.deepEqual({ builtIn, personal }, original)
+  assert.deepEqual(pantry, available('Bawang', 'Tubig'))
+})
+
+test('Something new excludes marked recipes, ignores favorites, and falls back only when all are familiar', () => {
+  const matches = getRecipeMatches(sessionRecipes, [])
+  const library = [
+    { recipeId: 'adobo', isFavorite: false, isFamiliar: true },
+    { recipeId: 'omelette', isFavorite: true, isFamiliar: false },
+  ]
+  const firstPool = getSomethingNewPool(matches, library)
+  assert.equal(firstPool.isFallback, false)
+  assert.deepEqual(firstPool.matches.map(({ recipe }) => recipe.id), ['omelette', 'soup'])
+  const first = selectCookingMode(newSession(), 'new', matches, 0, library)
+  const second = advanceRecommendationSession(first, matches, 0, false, library)
+  assert.deepEqual(second.rounds.new.suggestedIds, ['omelette', 'soup'])
+  assert.equal(advanceRecommendationSession(second, matches, 0, false, library), second)
+
+  const allFamiliar = sessionRecipes.map((recipe) => ({ recipeId: recipe.id, isFamiliar: true }))
+  assert.deepEqual(getSomethingNewPool(matches, allFamiliar), { matches, isFallback: true })
+  assert.deepEqual(getSomethingNewPool([], allFamiliar), { matches: [], isFallback: false })
+  assert.equal(advanceRecommendationSession(second, matches, 0, false, allFamiliar).rounds.new.currentId, 'adobo')
+})
+
+test('live familiarity changes replace a current dish and keep previously seen surviving recipes', () => {
+  const matches = getRecipeMatches(sessionRecipes, [])
+  const first = selectCookingMode(newSession(), 'new', matches, 0)
+  const library = [{ recipeId: 'adobo', isFamiliar: true }]
+  const updated = refreshRecommendationRound(first, 'new', matches, 0.99, library)
+  assert.deepEqual(updated.rounds.new, { currentId: 'soup', suggestedIds: ['adobo', 'soup'] })
+  assert.equal(refreshRecommendationRound(updated, 'new', matches, 0, []), updated)
+  const shopping = selectCookingMode(updated, 'shopping', matches, 0, library)
+  assert.equal(shopping.rounds.shopping.currentId, 'adobo')
+  const newMarks = [...library, { recipeId: 'soup', isFamiliar: true }]
+  const revisited = selectCookingMode(shopping, 'new', matches, 0.99, newMarks)
+  assert.equal(revisited.rounds.new.currentId, 'omelette')
+  assert.equal(revisited.rounds.shopping, shopping.rounds.shopping)
+  assert.equal(advanceRecommendationSession(revisited, matches, 0, true, newMarks), revisited)
+})
+
+test('editing keeps the current ID and refreshed content; deleting prunes all rounds and picks unseen', () => {
+  const matches = getRecipeMatches(sessionRecipes, available('Garlic'))
+  const shopping = selectCookingMode(newSession(), 'shopping', matches, 0)
+  const pantry = selectCookingMode(shopping, 'pantry', matches, 0)
+  assert.equal(pantry.rounds.pantry.currentId, 'adobo')
+  const edited = [{ ...sessionRecipes[0], name: 'Updated Adobo', ingredients: [{ name: 'Garlic' }] }, ...sessionRecipes.slice(1)]
+  const editedMatches = getRecipeMatches(edited, available('Garlic'))
+  assert.equal(reconcileRecipeIds(pantry, edited), pantry)
+  assert.equal(refreshRecommendationRound(pantry, 'pantry', editedMatches, 0), pantry)
+  assert.equal(editedMatches[0].recipe.name, 'Updated Adobo')
+  assert.equal(editedMatches[0].matchPercentage, 100)
+
+  const remaining = edited.slice(1)
+  const pruned = reconcileRecipeIds(pantry, remaining)
+  assert.deepEqual(pruned.rounds.pantry, { currentId: null, suggestedIds: [] })
+  assert.deepEqual(pruned.rounds.shopping, { currentId: null, suggestedIds: [] })
+  const replacement = refreshRecommendationRound(pruned, 'pantry', getRecipeMatches(remaining, available('Garlic')), 0.99)
+  assert.equal(replacement.rounds.pantry.currentId, 'soup')
+  assert.equal(replacement.rounds.shopping, pruned.rounds.shopping)
+})
+
+test('an exhausted round keeps history through recovery and offers added recipes without repeats', () => {
+  const matched = getRecipeMatches(sessionRecipes, [])
+  let session = selectCookingMode(newSession(), 'shopping', matched, 0)
+  session = advanceRecommendationSession(session, matched, 0, false)
+  session = advanceRecommendationSession(session, matched, 0, false)
+  assert.equal(advanceRecommendationSession(session, matched, 0, false), session)
+  const recoveredRecipe = { ...sessionRecipes[2], name: 'Recovered soup' }
+  const remappedRecipe = { ...sessionRecipes[2], id: 'session-soup' }
+  const recoveredCatalog = [...sessionRecipes.slice(0, 2), recoveredRecipe, remappedRecipe]
+  const reconciled = reconcileRecipeIds(session, recoveredCatalog, new Map([['soup', remappedRecipe]]))
+  assert.deepEqual(reconciled.rounds.shopping, {
+    currentId: 'session-soup', suggestedIds: ['adobo', 'omelette', 'session-soup'],
+  })
+  const newMatches = getRecipeMatches(recoveredCatalog, [])
+  assert.equal(refreshRecommendationRound(reconciled, 'shopping', newMatches, 0.99), reconciled)
+  const next = advanceRecommendationSession(reconciled, newMatches, 0, false)
+  assert.equal(next.rounds.shopping.currentId, 'soup')
+  assert.equal(newMatches.find(({ recipe }) => recipe.id === 'soup').recipe, recoveredRecipe)
+  assert.deepEqual(session.rounds.shopping.suggestedIds, ['adobo', 'omelette', 'soup'])
 })

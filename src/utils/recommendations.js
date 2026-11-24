@@ -58,8 +58,21 @@ export const getRecipeMatches = (recipes, ingredients) => {
   return recipes.map((recipe) => compareRecipeIngredients(recipe, availableNames))
 }
 
-export const getEligibleRecommendations = (mode, matches) => {
-  return mode === 'pantry' ? rankPantryRecommendations(matches) : matches
+export const getRecommendationCatalog = (builtInRecipes, personalRecipes) => [...builtInRecipes, ...personalRecipes]
+
+export const getSomethingNewPool = (matches, libraryEntries) => {
+  const familiarIds = new Set(libraryEntries.filter((entry) => entry.isFamiliar === true).map((entry) => entry.recipeId))
+  const unmarked = matches.filter((match) => !familiarIds.has(match.recipe.id))
+  if (unmarked.length === 0 && matches.length > 0) {
+    return { matches, isFallback: true }
+  }
+  return { matches: unmarked, isFallback: false }
+}
+
+export const getEligibleRecommendations = (mode, matches, libraryEntries = []) => {
+  if (mode === 'pantry') return rankPantryRecommendations(matches)
+  if (mode === 'new') return getSomethingNewPool(matches, libraryEntries).matches
+  return matches
 }
 
 export const selectNextRecommendation = (matches, suggestedIds, randomValue = 0) => {
@@ -85,7 +98,7 @@ const appendSuggestion = (suggestedIds, match) => {
   return { currentId, suggestedIds: [...suggestedIds, currentId] }
 }
 
-export const selectCookingMode = (session, mode, matches, randomValue) => {
+export const selectCookingMode = (session, mode, matches, randomValue, libraryEntries = []) => {
   if (mode === session.mode) {
     return session
   }
@@ -95,22 +108,22 @@ export const selectCookingMode = (session, mode, matches, randomValue) => {
     if (mode === 'pantry') {
       return refreshPantryRound(nextSession, matches)
     }
-    return nextSession
+    return refreshRecommendationRound(nextSession, mode, matches, randomValue, libraryEntries)
   }
 
-  const eligible = getEligibleRecommendations(mode, matches)
+  const eligible = getEligibleRecommendations(mode, matches, libraryEntries)
   const match = selectNextRecommendation(eligible, [], mode === 'pantry' ? 0 : randomValue)
   return updateRound(nextSession, mode, appendSuggestion([], match))
 }
 
-export const advanceRecommendationSession = (session, matches, randomValue, restart) => {
+export const advanceRecommendationSession = (session, matches, randomValue, restart, libraryEntries = []) => {
   const { mode } = session
   const round = session.rounds[mode]
   if (!round) {
     return session
   }
 
-  const eligible = getEligibleRecommendations(mode, matches)
+  const eligible = getEligibleRecommendations(mode, matches, libraryEntries)
   const selectionValue = mode === 'pantry' ? 0 : randomValue
   if (!restart) {
     const nextMatch = selectNextRecommendation(eligible, round.suggestedIds, selectionValue)
@@ -127,21 +140,43 @@ export const advanceRecommendationSession = (session, matches, randomValue, rest
   return updateRound(session, mode, appendSuggestion([], firstMatch))
 }
 
-export const refreshPantryRound = (session, matches) => {
-  const round = session.rounds.pantry
+export const refreshRecommendationRound = (session, mode, matches, randomValue, libraryEntries) => {
+  const round = session.rounds[mode]
   if (!round) {
     return session
   }
 
-  const eligible = rankPantryRecommendations(matches)
+  const eligible = getEligibleRecommendations(mode, matches, libraryEntries)
   if (eligible.some((match) => match.recipe.id === round.currentId)) {
     return session
   }
 
-  const nextMatch = selectNextRecommendation(eligible, round.suggestedIds)
+  const nextMatch = selectNextRecommendation(eligible, round.suggestedIds, mode === 'pantry' ? 0 : randomValue)
   if (!nextMatch && round.currentId === null) {
     return session
   }
 
-  return updateRound(session, 'pantry', appendSuggestion(round.suggestedIds, nextMatch))
+  return updateRound(session, mode, appendSuggestion(round.suggestedIds, nextMatch))
+}
+
+export const refreshPantryRound = (session, matches) =>
+  refreshRecommendationRound(session, 'pantry', matches, 0)
+
+export const reconcileRecipeIds = (session, catalog, remappedRecipes) => {
+  const validIds = new Set(catalog.map((recipe) => recipe.id))
+  const resolveId = (id) => {
+    const resolvedId = remappedRecipes?.get(id)?.id ?? id
+    return validIds.has(resolvedId) ? resolvedId : null
+  }
+
+  let nextSession = session
+  for (const [mode, round] of Object.entries(session.rounds)) {
+    const currentId = resolveId(round.currentId)
+    const suggestedIds = round.suggestedIds.map(resolveId).filter((id) => id !== null)
+    if (currentId !== round.currentId || suggestedIds.length !== round.suggestedIds.length ||
+        suggestedIds.some((id, index) => id !== round.suggestedIds[index])) {
+      nextSession = updateRound(nextSession, mode, { currentId, suggestedIds })
+    }
+  }
+  return nextSession
 }

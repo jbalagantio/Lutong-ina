@@ -23,8 +23,12 @@ import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
   getEligibleRecommendations,
+  getRecommendationCatalog,
   getRecipeMatches,
+  getSomethingNewPool,
+  reconcileRecipeIds,
   refreshPantryRound,
+  refreshRecommendationRound,
   selectCookingMode,
 } from './utils/recommendations.js'
 import './App.css'
@@ -35,6 +39,11 @@ const storageWarnings = {
   partial: 'Only some saved ingredients could be recovered.',
   'write-failed': 'Could not save pantry changes.',
   'quota-exceeded': 'Browser storage is full. Pantry changes could not be saved.',
+}
+
+const getDishesMatches = (ingredients, dishes) => {
+  const catalog = getRecommendationCatalog(recipes, dishes.personalRecipes)
+  return getRecipeMatches(catalog, ingredients)
 }
 
 const App = () => {
@@ -55,7 +64,7 @@ const App = () => {
     latestPantry.current = nextPantry
     setPantry(nextPantry)
     if (ingredientsChanged && activeScreen === 'home') {
-      const matches = getRecipeMatches(recipes, nextPantry.ingredients)
+      const matches = getDishesMatches(nextPantry.ingredients, latestDishes.current)
       setRecommendationSession((session) => (
         session.mode === 'pantry' ? refreshPantryRound(session, matches) : session
       ))
@@ -146,15 +155,21 @@ const App = () => {
     )
   }
 
-  const commitMyDishes = (nextDishes) => {
+  const commitMyDishes = (nextDishes, remappedRecipes) => {
+    const recipesChanged = latestDishes.current.personalRecipes !== nextDishes.personalRecipes
     latestDishes.current = nextDishes
     setMyDishes(nextDishes)
+    if (recipesChanged) {
+      const catalog = getRecommendationCatalog(recipes, nextDishes.personalRecipes)
+      // Rebase history now. Choose a replacement only when the round is visible.
+      setRecommendationSession((session) => reconcileRecipeIds(session, catalog, remappedRecipes))
+    }
   }
 
-  const saveAndCommitMyDishes = (nextDishes) => {
+  const saveAndCommitMyDishes = (nextDishes, remappedRecipes) => {
     const storageStatus = saveMyDishes(nextDishes)
     const replacementError = storageStatus === 'ready' ? undefined : nextDishes.replacementError
-    commitMyDishes({ ...nextDishes, storageStatus, replacementError })
+    commitMyDishes({ ...nextDishes, storageStatus, replacementError }, remappedRecipes)
     return storageStatus
   }
 
@@ -251,7 +266,7 @@ const App = () => {
       }
     })
     const libraryEntries = recoverLibraryEntries(recovered.libraryEntries, changes, remappedRecipes)
-    const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries })
+    const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries }, remappedRecipes)
     pendingLibraryChanges.current = new Map()
     return { status, remappedRecipes }
   }
@@ -291,24 +306,28 @@ const App = () => {
       recipeDraftChanged.current = false
     }
     if (screen === 'home') {
-      const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+      const dishes = latestDishes.current
+      const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
+      const randomValue = Math.random()
       setRecommendationSession((session) => (
-        session.mode === 'pantry' ? refreshPantryRound(session, matches) : session
+        refreshRecommendationRound(session, session.mode, matches, randomValue, dishes.libraryEntries)
       ))
     }
     setActiveScreen(screen)
   }
 
   const handleSelectMode = (mode) => {
-    const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+    const dishes = latestDishes.current
+    const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
     const randomValue = Math.random()
-    setRecommendationSession((session) => selectCookingMode(session, mode, matches, randomValue))
+    setRecommendationSession((session) => selectCookingMode(session, mode, matches, randomValue, dishes.libraryEntries))
   }
 
   const handleSuggestionAction = (restart) => {
-    const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+    const dishes = latestDishes.current
+    const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
     const randomValue = Math.random()
-    setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart))
+    setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart, dishes.libraryEntries))
   }
 
   let screen
@@ -343,13 +362,17 @@ const App = () => {
     screen = <Discover />
   } else {
     const { mode, rounds } = recommendationSession
-    const matches = mode ? getRecipeMatches(recipes, pantry.ingredients) : []
+    const matches = mode ? getDishesMatches(pantry.ingredients, myDishes) : []
+    const pool = mode === 'new'
+      ? getSomethingNewPool(matches, myDishes.libraryEntries)
+      : { matches: getEligibleRecommendations(mode, matches), isFallback: false }
     screen = (
       <Home
         ingredients={pantry.ingredients}
         mode={mode}
         round={rounds[mode]}
-        eligibleMatches={getEligibleRecommendations(mode, matches)}
+        eligibleMatches={pool.matches}
+        isFamiliarFallback={pool.isFallback}
         onSelectMode={handleSelectMode}
         onSuggestionAction={handleSuggestionAction}
         onOpenPantry={() => handleNavigate('pantry')}

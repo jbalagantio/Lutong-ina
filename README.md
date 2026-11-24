@@ -24,10 +24,10 @@ Open **Pantry** to add, edit, remove, and mark ingredients as available or out o
 Choose one of three cooking modes on **Home**:
 
 - **Use what I have** ranks dishes with at least one match by ingredient coverage, fewest missing ingredients, shortest cooking time, and recipe name.
-- **I'll go grocery shopping** draws from all 15 Filipino recipes and shows which ingredients to shop for.
-- **Something new** draws from recipes you have yet to see in the current round.
+- **I'll go grocery shopping** draws from the full catalog and shows which ingredients to shop for.
+- **Something new** draws from recipes not marked familiar. If all recipes are marked familiar, it draws from the full catalog. Each round avoids repeats.
 
-Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Each cooking mode keeps its own suggestion round while you navigate. Refreshing starts a new session. If a pantry suggestion loses its last match, the app moves to the next eligible unseen recipe when one exists. Pantry data stays in this browser, and the app shows a warning if storage fails. Home recommendations use the built-in catalog independently of My Dishes.
+Home recommendations include all built-in and personal recipes. Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Each cooking mode keeps its own suggestion round while you navigate. Refreshing starts a new session. If a suggestion becomes ineligible, the app moves to an eligible unseen recipe when one exists. Pantry data stays in this browser, and the app shows a warning if storage fails.
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 

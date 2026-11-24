@@ -18,7 +18,7 @@ const cookingOptions = [
   },
 ]
 
-const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSuggestionAction, onOpenPantry }) => {
+const Home = ({ ingredients, mode, round, eligibleMatches, isFamiliarFallback, onSelectMode, onSuggestionAction, onOpenPantry }) => {
   const currentMatch = eligibleMatches.find((match) => match.recipe.id === round?.currentId)
   const hasMore = eligibleMatches.some((match) => !round.suggestedIds.includes(match.recipe.id))
 
@@ -44,6 +44,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSugge
   }
 
   const showEmptyState = !currentMatch && eligibleMatches.length === 0
+  const fallbackMessage = isFamiliarFallback ? 'All recipes are marked familiar. Showing the full catalog.' : ''
   let announcement = ''
   if (currentMatch) {
     announcement = `${currentMatch.recipe.name}. ${suggestionStatus}`
@@ -52,6 +53,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSugge
   } else if (suggestionStatus) {
     announcement = suggestionStatus
   }
+  const statusAnnouncement = [announcement, fallbackMessage].filter(Boolean).join(' ')
 
   return (
     <div className="home-layout">
@@ -76,7 +78,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSugge
         </ul>
       </section>
 
-      <p className="visually-hidden" role="status">{announcement}</p>
+      <p className="visually-hidden" role="status">{statusAnnouncement}</p>
       {!mode && (
         <div className="suggestion-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -88,6 +90,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSugge
       {mode && (
         <div className="suggestion-panel">
           {currentMatch && <RecommendationCard match={currentMatch} />}
+          {fallbackMessage && <p className="suggestion-status">{fallbackMessage}</p>}
           {showEmptyState && (
             <div className="suggestion-empty">
               <p>{emptyMessage}</p>
