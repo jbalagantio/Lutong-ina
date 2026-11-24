@@ -220,11 +220,23 @@ h1 em {
   max-width: 46rem;
 }
 
+.screen-panel .discover-label {
+  margin: 0 0 0.5rem;
+  color: var(--green);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
 .search-field {
   display: grid;
   gap: 0.5rem;
   max-width: 28rem;
   margin-top: 1.5rem;
+}
+
+.search-field p {
+  margin: 0;
+  font-size: 0.875rem;
 }
 
 .search-field input {
