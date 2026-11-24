@@ -1,18 +1,18 @@
+import recipes from '../data/recipes.js'
+import DiscoverRecipeCard from './DiscoverRecipeCard.jsx'
+
+const catalog = [...recipes].sort((first, second) => first.name.localeCompare(second.name, 'en'))
+
 const Discover = () => {
   return (
-    <section className="screen-panel" aria-labelledby="discover-heading">
+    <section className="discover" aria-labelledby="discover-heading">
       <h1 id="discover-heading" lang="fil" tabIndex={-1}>Ma, <em>anong ulam?</em></h1>
-      <div className="search-field">
-        <label className="visually-hidden" htmlFor="recipe-search">Search recipes</label>
-        <input
-          id="recipe-search"
-          type="search"
-          placeholder="Search dishes or ingredients..."
-          aria-describedby="search-status"
-          disabled
-        />
-        <p id="search-status">Recipe search coming soon.</p>
-      </div>
+      <p className="discover-count">{catalog.length} recipes</p>
+      <ul className="discover-grid" role="list">
+        {catalog.map((recipe) => (
+          <li key={recipe.id}><DiscoverRecipeCard recipe={recipe} /></li>
+        ))}
+      </ul>
     </section>
   )
 }

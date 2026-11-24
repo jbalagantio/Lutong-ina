@@ -34,7 +34,8 @@ const RecipePhoto = ({ recipe, image, externalUrl, draftPhoto, layout, eager = f
   const useLocal = localUrl && localUrl !== failedLocal
   const useExternal = !useLocal && externalUrl && externalUrl !== failedExternal
   const url = useLocal ? localUrl : useExternal ? externalUrl : undefined
-  const objectPosition = useExternal ? image.objectPosition?.[layout] : undefined
+  const positionLayout = layout === 'catalog' ? 'landscape' : layout
+  const objectPosition = useExternal ? image.objectPosition?.[positionLayout] : undefined
 
   return (
     <div className={`recipe-photo recipe-photo-${layout}`}>

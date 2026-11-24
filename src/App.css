@@ -218,7 +218,6 @@ h1 {
 .recommendation-card p,
 .suggestion-empty,
 .suggestion-status,
-.screen-panel p,
 .pantry-empty,
 .pantry-item-name p {
   color: var(--muted);
@@ -254,8 +253,7 @@ h1 {
 
 .suggestion-action,
 .suggestion-empty .pantry-actions,
-.suggestion-status,
-.screen-panel > p {
+.suggestion-status {
   margin-top: 0.85rem;
 }
 
@@ -276,19 +274,10 @@ h1 {
   margin-top: 0.5rem;
 }
 
-.search-field {
-  display: grid;
-  gap: 0.4rem;
-  max-width: 28rem;
-  margin-top: 1rem;
-}
-
-.search-field p,
 .pantry-item-name p {
   font-size: 0.875rem;
 }
 
-.search-field input,
 .pantry-fields input,
 .pantry-fields select,
 .recipe-form input,
@@ -303,11 +292,6 @@ h1 {
   color: var(--cream);
 }
 
-.search-field input:disabled {
-  opacity: 0.8;
-}
-
-.search-field input::placeholder,
 .pantry-fields input::placeholder {
   color: var(--muted);
   opacity: 1;
@@ -762,6 +746,58 @@ h1 {
 .recipe-photo-frame svg {
   width: 32px;
   height: 32px;
+}
+
+.recipe-photo-catalog .recipe-photo-frame {
+  aspect-ratio: 4 / 3;
+}
+
+.discover-count {
+  margin-block: 0.75rem 1.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.75rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.discover-recipe {
+  display: grid;
+  gap: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.discover-recipe .recipe-photo-credit {
+  margin-top: 0;
+}
+
+.discover-recipe h2 {
+  margin-top: 0.2rem;
+  font-size: clamp(1.35rem, 2.2vw, 1.65rem);
+}
+
+@media (min-width: 30rem) {
+  .discover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .discover-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 90rem) {
+  .discover-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .recipe-photo-landscape {

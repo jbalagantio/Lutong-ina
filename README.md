@@ -33,7 +33,7 @@ Home recommendations include all built-in and personal recipes. Matches use avai
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 
-**Discover** displays a placeholder. Recipe search is coming soon.
+**Discover** shows the built-in recipe catalog in alphabetical order, with photographs, cooking times, and difficulty. The catalog includes saved and familiar built-in dishes. Search, filters, and recipe detail interactions are planned for later checkpoints.
 
 Run `node --test` to verify recipe and photo utilities, ingredient matching, pantry utilities, and recommendation rules.
 
