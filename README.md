@@ -1,6 +1,6 @@
 # Lutong Ina
 
-Lutong Ina is a personal cooking decision companion. Phase 1 establishes its React application foundation.
+Lutong Ina is a personal cooking decision companion built with React and Vite.
 
 ## Run locally
 
@@ -13,10 +13,10 @@ npm run dev
 
 Run `npm run lint` to check the source and `npm run build` to create the production build.
 
-## Phase 1
+## Current features
 
-Home, My Dishes, Pantry, and Discover are available through the main navigation. Home shows three planned cooking modes and an empty suggestion panel. The recommendation controls and Discover search are visible and disabled. My Dishes and Pantry explain their current availability.
+Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty.
 
-The active screen is held in React state and resets to Home on reload. Recipe data, recommendation rules, and localStorage persistence are planned for later phases.
+The code includes 15 Filipino recipes with measured ingredients and cooking steps. Recipe browsing, recommendations, and My Dishes management are planned for later phases. The active screen resets to Home on reload.
 
-Codex assisted with the React components, CSS, starter cleanup, and verification.
+Codex assisted with the React components, CSS, sample recipe data, pantry behavior, and verification.

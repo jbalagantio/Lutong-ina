@@ -253,6 +253,161 @@ h1 em {
   opacity: 1;
 }
 
+.pantry-panel {
+  max-width: none;
+}
+
+.pantry-header,
+.pantry-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pantry-counts,
+.pantry-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  list-style: none;
+}
+
+.pantry-counts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 28rem;
+}
+
+.pantry-counts li,
+.pantry-item,
+.pantry-form,
+.screen-panel .pantry-empty {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: #131814;
+}
+
+.pantry-available {
+  color: var(--green);
+}
+
+.pantry-counts strong {
+  display: block;
+  font-size: 1.5rem;
+}
+
+.pantry-form,
+.pantry-filters {
+  margin-top: 1.5rem;
+}
+
+.pantry-fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pantry-form .pantry-fields {
+  margin-top: 1rem;
+}
+
+.pantry-fields label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.pantry-fields input,
+.pantry-fields select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #576052;
+  border-radius: 0.6rem;
+  background: #101312;
+  color: var(--cream);
+  font: inherit;
+}
+
+.pantry-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+}
+
+.pantry-checkbox input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--orange);
+}
+
+.pantry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pantry-form .pantry-actions {
+  margin-top: 1rem;
+}
+
+.pantry-button {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #576052;
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.pantry-button:hover {
+  border-color: var(--orange);
+}
+
+.pantry-primary {
+  border-color: var(--orange);
+  background: var(--orange);
+  color: #22160e;
+  font-weight: 650;
+}
+
+.pantry-primary:hover {
+  background: #ffb685;
+}
+
+.pantry-item > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pantry-item p {
+  margin-top: 0.2rem;
+}
+
+.screen-panel .pantry-empty {
+  margin-top: 1.25rem;
+}
+
+.screen-panel .pantry-error {
+  color: #ffb4a4;
+}
+
+@media (min-width: 48rem) {
+  .pantry-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pantry-filters {
+    grid-template-columns: 2fr repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 40rem) {
   .app-bar {
     display: flex;
