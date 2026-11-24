@@ -1,7 +1,7 @@
 import RecipeImage, { RecipeImageCredit } from './RecipeImage.jsx'
 import { recipeImages } from '../data/recipeImages.js'
 
-const LibraryRecipeRow = ({ recipe, isExpanded, onToggleDetails, groceryAction, children }) => (
+const LibraryRecipeRow = ({ recipe, isExpanded, onToggleDetails, recipeActions, children }) => (
   <li className="personal-recipe">
     <div className="dishes-header">
       <div className="dish-photo-summary">
@@ -40,7 +40,7 @@ const LibraryRecipeRow = ({ recipe, isExpanded, onToggleDetails, groceryAction, 
             <li key={index}>{ingredient.quantity} {ingredient.unit} {ingredient.name}</li>
           ))}
         </ul>
-        {groceryAction}
+        {recipeActions}
         <h3>Instructions</h3>
         <ol>
           {recipe.instructions.map((step, index) => <li key={index}>{step}</li>)}

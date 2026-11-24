@@ -35,6 +35,12 @@ New items use the first matching pantry record with a valid category, in display
 
 Both Pantry views keep their drafts and filters when switching. Leaving Pantry with a changed grocery draft asks for confirmation. Accepted grocery changes save to `lutong-ina-grocery-list` in the current browser. Loading does not write on startup. After a failed read, retry merges saved items with the surviving session items, assigns new IDs to colliding session items, and keeps valid legacy aliases. Invalid or partial storage stays protected until confirmed replacement. If saving fails, current changes stay in memory and can be lost on refresh. Grocery storage is local to this browser and does not synchronize concurrent edits across tabs.
 
+Use **Mark as cooked** on a Home recommendation, in Discover recipe details, or on an expanded recipe in My Dishes. To record it again from the same open recipe, choose **Record another meal** and confirm. Each event stores the recipe ID, its name at the time, and a UTC timestamp. It leaves bookmarks, preferences, pantry availability, grocery items, and recommendation ranking alone.
+
+Open **My Dishes → Cooking History** to search name snapshots and remove individual events. Meals appear newest first, grouped by your device's local date. Name changes and recipe deletions leave past entries intact. Cooking History and Recipe Library preserve open recipe drafts when switching views.
+
+History stays in this browser under `lutong-ina-cooking-history`. A failed read can be retried, merging readable saved records with current-session events. Invalid or partial storage requires confirmed replacement. Unsaved events may be lost on refresh. Records for personal recipes created during a My Dishes read failure stay in memory until that read recovers and the recipe ID is resolved.
+
 Choose one of three cooking modes on **Home**:
 
 - **Use what I have** ranks dishes with at least one match by ingredient coverage, fewest missing ingredients, shortest cooking time, and recipe name.

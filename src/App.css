@@ -333,9 +333,32 @@ h1 {
   font-size: clamp(1.4rem, 2.5vw, 1.75rem);
 }
 
-.recipe-grocery {
+.recipe-grocery,
+.recipe-cooking {
   margin-block: 0.85rem;
   overflow-wrap: anywhere;
+}
+
+.cooking-history {
+  margin-top: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.cooking-history-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.cooking-history-search label {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.cooking-history-search input {
+  min-width: 0;
 }
 
 .recipe-grocery-feedback:empty {

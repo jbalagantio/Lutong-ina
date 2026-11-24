@@ -6,6 +6,11 @@ import MyDishes from './components/MyDishes.jsx'
 import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
 import RecipeGroceryAction from './components/RecipeGroceryAction.jsx'
+import RecipeCookingAction from './components/RecipeCookingAction.jsx'
+import {
+  createCookingRecord, loadCookingHistory, needsHistoryReplacement, recoverCookingRecords,
+  remapSessionCookingRecipes, removeCookingRecord, saveCookingHistory,
+} from './utils/cookingHistory.js'
 import recipes from './data/recipes.js'
 import {
   deletePersonalRecipe,
@@ -55,9 +60,11 @@ const getDishesMatches = (ingredients, dishes) => {
 const App = ({ canReconcilePhotos }) => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [initialPantryView, setInitialPantryView] = useState('ingredients')
+  const [dishesView, setDishesView] = useState('library')
   const [pantry, setPantry] = useState(loadPantry)
   const [groceryList, setGroceryList] = useState(loadGroceryList)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
+  const [cookingHistory, setCookingHistory] = useState(loadCookingHistory)
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const mainContent = useRef(null)
   const hasNavigated = useRef(false)
@@ -65,6 +72,7 @@ const App = ({ canReconcilePhotos }) => {
   const latestGroceryList = useRef(groceryList)
   const groceryDraftChanged = useRef(false)
   const latestDishes = useRef(myDishes)
+  const latestHistory = useRef(cookingHistory)
   const pendingLibraryChanges = useRef(new Map())
   const recipeDraftChanged = useRef(false)
   const savingPhoto = useRef(false)
@@ -75,9 +83,101 @@ const App = ({ canReconcilePhotos }) => {
   useLayoutEffect(() => {
     if (!hasNavigated.current) return
     hasNavigated.current = false
-    const heading = activeScreen === 'pantry' && initialPantryView === 'grocery' ? '#grocery-heading' : 'h1'
+    let heading = 'h1'
+    if (activeScreen === 'pantry' && initialPantryView === 'grocery') heading = '#grocery-heading'
+    if (activeScreen === 'my-dishes' && dishesView === 'history') heading = '#history-heading'
     mainContent.current?.querySelector(heading)?.focus()
-  }, [activeScreen, initialPantryView])
+  }, [activeScreen, initialPantryView, dishesView])
+
+  const commitHistory = (nextHistory) => {
+    latestHistory.current = nextHistory
+    setCookingHistory(nextHistory)
+  }
+
+  const saveAndCommitHistory = (nextHistory, replacing = false) => {
+    const { pendingRecordIds } = nextHistory
+    // A session recipe may still collide with an unread saved recipe ID.
+    const records = nextHistory.records.filter((record) => !pendingRecordIds?.has(record.id))
+    const storageStatus = saveCookingHistory({
+      records, storageStatus: replacing ? 'ready' : nextHistory.storageStatus,
+    })
+    if (replacing && storageStatus !== 'ready') {
+      commitHistory({ ...nextHistory, replacementError: storageStatus })
+    } else {
+      commitHistory({
+        ...nextHistory,
+        storageStatus,
+        replacementError: storageStatus === 'ready' ? undefined : nextHistory.replacementError,
+        hasUnsavedChanges: storageStatus !== 'ready',
+      })
+    }
+    return storageStatus
+  }
+
+  const handleRecordCooking = (recipeId) => {
+    const dishes = latestDishes.current
+    const personalRecipe = dishes.personalRecipes.find((recipe) => recipe.id === recipeId)
+    const recipe = personalRecipe ?? recipes.find((entry) => entry.id === recipeId)
+    const current = latestHistory.current
+    const record = createCookingRecord(current.records, recipe)
+    if (!record) return null
+
+    const records = [...current.records, record]
+    if (personalRecipe && dishes.storageStatus === 'read-failed') {
+      const pendingRecordIds = new Set(current.pendingRecordIds)
+      pendingRecordIds.add(record.id)
+      commitHistory({ ...current, records, pendingRecordIds })
+    } else {
+      saveAndCommitHistory({ ...current, records })
+    }
+    return record
+  }
+
+  const handleRemoveCooking = (id) => {
+    const current = latestHistory.current
+    const records = removeCookingRecord(current.records, id)
+    if (records === current.records) return false
+    if (current.pendingRecordIds?.has(id)) {
+      const pendingRecordIds = new Set(current.pendingRecordIds)
+      pendingRecordIds.delete(id)
+      commitHistory({ ...current, records, pendingRecordIds })
+    } else if (current.storageStatus === 'read-failed' && records.length === 0) {
+      commitHistory({ ...current, records, hasUnsavedChanges: false })
+    } else {
+      saveAndCommitHistory({ ...current, records })
+    }
+    return true
+  }
+
+  const handleRetryHistory = () => {
+    const current = latestHistory.current
+    if (current.storageStatus !== 'read-failed') return saveAndCommitHistory(current)
+    const recovered = loadCookingHistory()
+    if (recovered.storageStatus === 'read-failed') return 'read-failed'
+    if (current.records.length === 0) {
+      commitHistory(recovered)
+      return recovered.storageStatus
+    }
+    const { records, remappedIds } = recoverCookingRecords(recovered.records, current.records)
+    const pendingRecordIds = new Set([...(current.pendingRecordIds ?? [])].map((id) => remappedIds.get(id) ?? id))
+    return saveAndCommitHistory({ ...recovered, records, pendingRecordIds })
+  }
+
+  const handleReplaceHistory = () => {
+    const current = latestHistory.current
+    if (!needsHistoryReplacement(current.storageStatus)) return false
+    if (!window.confirm('Replace saved cooking history with the readable records and current changes? Unreadable entries will be lost.')) {
+      return false
+    }
+    return saveAndCommitHistory(current, true) === 'ready'
+  }
+
+  const settleSessionCookingRecords = (remappedRecipes) => {
+    const current = latestHistory.current
+    if (!current.pendingRecordIds?.size) return
+    const records = remapSessionCookingRecipes(current.records, current.pendingRecordIds, remappedRecipes)
+    saveAndCommitHistory({ ...current, records, pendingRecordIds: undefined })
+  }
 
   const commitPantry = (nextPantry) => {
     // Consecutive actions can run before React renders the previous update.
@@ -417,6 +517,7 @@ const App = ({ canReconcilePhotos }) => {
     const changes = pendingLibraryChanges.current
     if (current.personalRecipes.length === 0 && changes.size === 0) {
       commitMyDishes(recovered)
+      settleSessionCookingRecords(new Map())
       void cleanUpPhotos()
       return { status: recovered.storageStatus, remappedRecipes: new Map() }
     }
@@ -432,6 +533,7 @@ const App = ({ canReconcilePhotos }) => {
     })
     const libraryEntries = recoverLibraryEntries(recovered.libraryEntries, changes, remappedRecipes)
     const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries }, remappedRecipes)
+    settleSessionCookingRecords(remappedRecipes)
     pendingLibraryChanges.current = new Map()
     return { status, remappedRecipes }
   }
@@ -464,7 +566,7 @@ const App = ({ canReconcilePhotos }) => {
     recipeDraftChanged.current = isDirty
   }
 
-  const handleNavigate = (screen, trigger, pantryView = 'ingredients') => {
+  const handleNavigate = (screen, trigger, targetView) => {
     if (activeScreen === 'pantry' && screen !== activeScreen) {
       if (groceryDraftChanged.current && !window.confirm('Discard unsaved grocery item changes?')) {
         trigger?.focus()
@@ -489,7 +591,12 @@ const App = ({ canReconcilePhotos }) => {
     }
     if (screen !== activeScreen) {
       hasNavigated.current = true
-      if (screen === 'pantry') setInitialPantryView(pantryView)
+      if (screen === 'pantry') setInitialPantryView(targetView ?? 'ingredients')
+    }
+    if (screen === 'my-dishes') {
+      const nextView = targetView ?? 'library'
+      if (nextView !== dishesView) hasNavigated.current = true
+      setDishesView(nextView)
     }
     setActiveScreen(screen)
     if (screen === 'my-dishes') void cleanUpPhotos()
@@ -509,10 +616,14 @@ const App = ({ canReconcilePhotos }) => {
     setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart, dishes.libraryEntries))
   }
 
-  const renderGroceryAction = (match) => (
-    <RecipeGroceryAction key={match.recipe.id} match={match} pantryIngredients={pantry.ingredients} groceryList={groceryList}
-      onAdd={handleAddRecipeGroceries}
-      onView={(event) => handleNavigate('pantry', event.currentTarget, 'grocery')} />
+  const renderRecipeActions = (match) => (
+    <div key={match.recipe.id}>
+      <RecipeGroceryAction match={match} pantryIngredients={pantry.ingredients} groceryList={groceryList}
+        onAdd={handleAddRecipeGroceries}
+        onView={(event) => handleNavigate('pantry', event.currentTarget, 'grocery')} />
+      <RecipeCookingAction recipe={match.recipe} history={cookingHistory} onRecord={handleRecordCooking}
+        onView={(event) => handleNavigate('my-dishes', event.currentTarget, 'history')} />
+    </div>
   )
 
   let screen
@@ -520,7 +631,13 @@ const App = ({ canReconcilePhotos }) => {
     screen = (
       <MyDishes
         pantryIngredients={pantry.ingredients}
-        renderGroceryAction={renderGroceryAction}
+        renderRecipeActions={renderRecipeActions}
+        view={dishesView}
+        onChangeView={setDishesView}
+        history={cookingHistory}
+        onRemoveCooking={handleRemoveCooking}
+        onRetryHistory={handleRetryHistory}
+        onReplaceHistory={handleReplaceHistory}
         canDiscardDraft={canDiscardRecipeDraft}
         onDraftChange={handleRecipeDraftChange}
         personalRecipes={myDishes.personalRecipes}
@@ -563,7 +680,7 @@ const App = ({ canReconcilePhotos }) => {
   } else if (activeScreen === 'discover') {
     screen = (
       <Discover
-        renderGroceryAction={renderGroceryAction}
+        renderRecipeActions={renderRecipeActions}
         pantryIngredients={pantry.ingredients}
         libraryEntries={myDishes.libraryEntries}
         libraryStorageStatus={myDishes.storageStatus}
@@ -580,7 +697,7 @@ const App = ({ canReconcilePhotos }) => {
       : { matches: getEligibleRecommendations(mode, matches), isFallback: false }
     screen = (
       <Home
-        renderGroceryAction={renderGroceryAction}
+        renderRecipeActions={renderRecipeActions}
         ingredients={pantry.ingredients}
         mode={mode}
         round={rounds[mode]}

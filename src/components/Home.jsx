@@ -18,7 +18,7 @@ const cookingOptions = [
   },
 ]
 
-const Home = ({ ingredients, mode, round, eligibleMatches, isFamiliarFallback, onSelectMode, onSuggestionAction, onOpenPantry, renderGroceryAction }) => {
+const Home = ({ ingredients, mode, round, eligibleMatches, isFamiliarFallback, onSelectMode, onSuggestionAction, onOpenPantry, renderRecipeActions }) => {
   const currentMatch = eligibleMatches.find((match) => match.recipe.id === round?.currentId)
   const hasMore = eligibleMatches.some((match) => !round.suggestedIds.includes(match.recipe.id))
 
@@ -89,7 +89,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, isFamiliarFallback, o
       )}
       {mode && (
         <div className="suggestion-panel">
-          {currentMatch && <RecommendationCard match={currentMatch} groceryAction={renderGroceryAction(currentMatch)} />}
+          {currentMatch && <RecommendationCard match={currentMatch} recipeActions={renderRecipeActions(currentMatch)} />}
           {fallbackMessage && <p className="suggestion-status">{fallbackMessage}</p>}
           {showEmptyState && (
             <div className="suggestion-empty">
