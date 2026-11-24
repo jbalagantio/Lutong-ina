@@ -21,7 +21,10 @@ import {
   toggleRecipePreference,
 } from './utils/myDishes.js'
 import { reconcileRecipePhotos, saveRecipePhoto } from './utils/recipePhotos.js'
-import { addMissingGroceryItems, loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem, saveGroceryList } from './utils/groceryList.js'
+import {
+  addMissingGroceryItems, loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem,
+  saveGroceryList, setGroceryPurchased, transferPurchasedItems,
+} from './utils/groceryList.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -200,6 +203,20 @@ const App = ({ canReconcilePhotos }) => {
     const hasUnsavedChanges = current.storageStatus !== 'read-failed' || items.length > 0
     saveAndCommitGroceryList({ ...current, items, hasUnsavedChanges })
   }
+
+  const handlePurchaseGroceryItem = (id, isPurchased) => {
+    const current = latestGroceryList.current
+    const items = setGroceryPurchased(current.items, id, isPurchased)
+    if (items === current.items) return false
+    saveAndCommitGroceryList({ ...current, items, hasUnsavedChanges: true })
+    return true
+  }
+
+  const handleTransferPurchasedItems = (confirmRemoval) => transferPurchasedItems(
+    latestPantry.current,
+    latestGroceryList.current,
+    { confirmRemoval, commitPantry, commitGrocery: commitGroceryList },
+  )
 
   const handleRetryGroceryList = () => {
     const current = latestGroceryList.current
@@ -527,6 +544,7 @@ const App = ({ canReconcilePhotos }) => {
     screen = (
       <Pantry
         initialView={initialPantryView}
+        pantryStorageStatus={pantry.storageStatus}
         ingredients={pantry.ingredients}
         onAddIngredient={handleAddIngredient}
         onEditIngredient={handleEditIngredient}
@@ -537,6 +555,8 @@ const App = ({ canReconcilePhotos }) => {
         onReplaceGroceryList={handleReplaceGroceryList}
         onSaveGroceryItem={handleSaveGroceryItem}
         onRemoveGroceryItem={handleRemoveGroceryItem}
+        onPurchaseGroceryItem={handlePurchaseGroceryItem}
+        onTransferPurchasedItems={handleTransferPurchasedItems}
         onGroceryDraftChange={(changed) => { groceryDraftChanged.current = changed }}
       />
     )
@@ -582,7 +602,7 @@ const App = ({ canReconcilePhotos }) => {
       </div>
       <main ref={mainContent} id="main-content" className="main-content" tabIndex={-1}>
         {storageWarning && (
-          <div className="storage-warning">
+          <div className="storage-warning" id="pantry-storage-warning" tabIndex={-1}>
             <p role="alert">
               {storageWarning}
               {pantry.replacementError && ` ${storageWarnings[pantry.replacementError]}`}

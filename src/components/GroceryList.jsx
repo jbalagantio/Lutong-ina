@@ -1,19 +1,23 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { filterGroceryItems, groceryStorageWarnings, groceryUnsavedWarning } from '../utils/groceryList.js'
 import { pantryCategories } from '../utils/pantry.js'
 import GroceryItemForm from './GroceryItemForm.jsx'
 
-const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraftChange }) => {
+const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onSave, onRemove, onPurchase, onTransfer, onDraftChange }) => {
   const heading = useRef(null)
   const addButton = useRef(null)
   const searchInput = useRef(null)
   const formTrigger = useRef(null)
+  const purchaseInputs = useRef(new Map())
+  const pendingPurchaseFocus = useRef(null)
+  const transferFeedback = useRef(null)
   const draftChanged = useRef(false)
   const editorNumber = useRef(0)
   const [editor, setEditor] = useState(null)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [announcement, setAnnouncement] = useState('')
+  const [transferResult, setTransferResult] = useState(null)
   const { items, storageStatus, replacementError, hasUnsavedChanges } = groceryList
   const visibleItems = filterGroceryItems(items, search, category)
   const purchasedCount = items.filter((item) => item.isPurchased).length
@@ -23,6 +27,30 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
   ]
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
   const warning = groceryStorageWarnings[storageStatus]
+  const showPantryRecovery = pantryStorageStatus !== 'ready' &&
+    ['pantry-protected', 'pantry-failed'].includes(transferResult?.status)
+  const showGroceryRecovery = warning && ['grocery-protected', 'grocery-failed'].includes(transferResult?.status)
+  const resolvedBlock = (transferResult?.status === 'pantry-protected' && !showPantryRecovery) ||
+    (transferResult?.status === 'grocery-protected' && !showGroceryRecovery)
+
+  useLayoutEffect(() => {
+    const id = pendingPurchaseFocus.current
+    if (id === null) return
+    pendingPurchaseFocus.current = null
+    const target = purchaseInputs.current.get(id) ?? searchInput.current
+    target?.focus()
+  }, [items])
+
+  const trackPurchaseInput = (id, input) => {
+    if (input) purchaseInputs.current.set(id, input)
+    else purchaseInputs.current.delete(id)
+  }
+
+  const changePurchase = (item, isPurchased) => {
+    if (!onPurchase(item.id, isPurchased)) return
+    pendingPurchaseFocus.current = item.id
+    setTransferResult(null)
+  }
 
   const retry = () => {
     const { storageStatus: status, remappedIds } = onRetry()
@@ -97,6 +125,39 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
     else addButton.current?.focus()
   }
 
+  const transferPurchased = (event) => {
+    const result = onTransfer((representedIds) => (
+      !representedIds.has(editor?.id) || !draftChanged.current ||
+      window.confirm('This transfer will remove the item you are editing. Discard its unsaved changes if the transfer succeeds?')
+    ))
+    if (result.status === 'cancelled') {
+      event.currentTarget.focus()
+      return
+    }
+    let message = ''
+    if (result.status === 'pantry-protected') message = 'Recover saved Pantry data before transferring.'
+    if (result.status === 'grocery-protected') message = 'Recover the saved grocery list before transferring.'
+    if (result.status === 'empty') message = 'No eligible purchased items to transfer.'
+    if (result.status === 'pantry-failed') message = 'Pantry could not be saved. Purchased items were kept.'
+    if (result.status === 'grocery-failed') {
+      message = 'Pantry is saved. Grocery cleanup failed, so purchased items were kept. Try the transfer again.'
+    }
+    if (result.status === 'transferred') {
+      const count = result.representedIds.size
+      message = `Transferred ${count} grocery ${count === 1 ? 'item' : 'items'}.`
+    }
+    if (result.created?.length) message += ` ${result.created.length} new.`
+    if (result.restocked?.length) message += ` ${result.restocked.length} restocked.`
+    if (result.alreadyAvailable?.length) message += ` ${result.alreadyAvailable.length} already available.`
+    if (result.skipped?.length) message += ` ${result.skipped.length} skipped.`
+    setTransferResult({ status: result.status, message })
+    if (result.status === 'transferred' && result.representedIds.has(editor?.id)) {
+      closeEditor(transferFeedback.current)
+    } else {
+      transferFeedback.current?.focus()
+    }
+  }
+
   return (
     <section className="grocery-list" aria-labelledby="grocery-heading">
       <div className="pantry-header">
@@ -105,7 +166,7 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
           onClick={(event) => openEditor(null, event.currentTarget)}>Add item</button>
       </div>
       {warning && (
-        <div className="storage-warning grocery-warning">
+        <div className="storage-warning grocery-warning" id="grocery-storage-warning" tabIndex={-1}>
           <p role="alert">
             {warning} {groceryStorageWarnings[replacementError]}
             {needsReplacement && ' Saved data stays protected until you confirm replacement.'}
@@ -139,11 +200,25 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
         </label>
       </div>
       <p className="visually-hidden" role="status">{announcement}</p>
+      <p className="grocery-transfer-feedback" role="status" tabIndex={-1} ref={transferFeedback}>
+        {!resolvedBlock && transferResult?.message}
+      </p>
+      {showPantryRecovery && (
+        <a href="#pantry-storage-warning">Pantry storage options</a>
+      )}
+      {showGroceryRecovery && (
+        <a href="#grocery-storage-warning">Grocery storage options</a>
+      )}
       {items.length === 0 && !needsReplacement && storageStatus !== 'read-failed' && <p className="pantry-empty">Your grocery list is empty.</p>}
       {items.length > 0 && visibleItems.length === 0 && <p className="pantry-empty" role="status">No matching grocery items.</p>}
       {items.length > 0 && (
         <>
           <p className="grocery-count">{purchasedCount} of {items.length} purchased</p>
+          {purchasedCount > 0 && (
+            <button className="pantry-button grocery-transfer" type="button" onClick={transferPurchased}>
+              Add purchased items to pantry (all {purchasedCount})
+            </button>
+          )}
           {groups
             .filter((group) => group.items.length > 0)
             .map((group) => (
@@ -157,6 +232,11 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
                         <p>{item.category}</p>
                       </div>
                       <div className="pantry-actions">
+                        <label className="grocery-purchase">
+                          <input type="checkbox" checked={item.isPurchased} aria-label={`Purchased: ${item.name}`}
+                            ref={(input) => trackPurchaseInput(item.id, input)}
+                            onChange={(event) => changePurchase(item, event.target.checked)} />
+                        </label>
                         <button className="icon-button" type="button" aria-label={`Edit ${item.name}`} title="Edit"
                           onClick={(event) => openEditor(item, event.currentTarget)}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

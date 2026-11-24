@@ -5,6 +5,7 @@ import PantryForm from './PantryForm.jsx'
 
 const Pantry = ({
   initialView,
+  pantryStorageStatus,
   ingredients,
   onAddIngredient,
   onEditIngredient,
@@ -15,6 +16,8 @@ const Pantry = ({
   onReplaceGroceryList,
   onSaveGroceryItem,
   onRemoveGroceryItem,
+  onPurchaseGroceryItem,
+  onTransferPurchasedItems,
   onGroceryDraftChange,
 }) => {
   const [activeView, setActiveView] = useState(initialView)
@@ -195,10 +198,13 @@ const Pantry = ({
       <div hidden={showIngredients}>
         <GroceryList
           groceryList={groceryList}
+          pantryStorageStatus={pantryStorageStatus}
           onRetry={onRetryGroceryList}
           onReplace={onReplaceGroceryList}
           onSave={onSaveGroceryItem}
           onRemove={onRemoveGroceryItem}
+          onPurchase={onPurchaseGroceryItem}
+          onTransfer={onTransferPurchasedItems}
           onDraftChange={onGroceryDraftChange}
         />
       </div>

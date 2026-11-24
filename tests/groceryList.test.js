@@ -3,8 +3,9 @@ import { test } from 'node:test'
 import {
   addMissingGroceryItems, filterGroceryItems, loadGroceryList, planGroceryAddition, prepareGroceryItem,
   recoverGroceryItems, removeGroceryItem, resolveGroceryCategory, saveGroceryList,
+  planPurchasedTransfer, setGroceryPurchased, transferPurchasedItems,
 } from '../src/utils/groceryList.js'
-import { pantryCategories, pantryNameLimit } from '../src/utils/pantry.js'
+import { loadPantry, pantryCategories, pantryNameLimit } from '../src/utils/pantry.js'
 import { getRecipeMatches } from '../src/utils/recommendations.js'
 import recipes from '../src/data/recipes.js'
 
@@ -272,4 +273,133 @@ test('bulk additions survive a blocked read and preserve protected storage and u
   }
   assert.equal(storage.setItem.mock.callCount(), 0)
   assert.equal(values.get('unrelated'), 'keep')
+})
+
+test('purchase updates preserve order and metadata, reverse cleanly, and reject invalid or redundant updates', () => {
+  const original = [garlic, bawang]
+  const purchased = setGroceryPurchased(original, garlic.id, true)
+  assert.deepEqual(purchased, [{ ...garlic, isPurchased: true }, bawang])
+  assert.equal(purchased[1], bawang)
+  assert.equal(garlic.isPurchased, false)
+  assert.deepEqual(setGroceryPurchased(purchased, garlic.id, false), original)
+  assert.equal(setGroceryPurchased(purchased, garlic.id, true), purchased)
+  assert.equal(setGroceryPurchased(original, 'missing', true), original)
+  assert.equal(setGroceryPurchased(original, garlic.id, 'true'), original)
+  assert.equal(setGroceryPurchased(original, null, true), original)
+})
+
+test('transfer planning prefers available aliases, restocks the first unavailable record, and appends unique ingredients', (context) => {
+  const stock = (id, name, isAvailable) => ({ id, name, isAvailable, category: 'Seasonings' })
+  const pantry = [
+    stock('1', 'Garlic', false), stock('2', 'Bawang', false), stock('3', 'Egg', false), stock('4', 'Itlog', true),
+  ]
+  const original = structuredClone(pantry)
+  const grocery = [
+    bawang, { ...bawang, id: 'g2', name: 'Garlic' }, { ...bawang, id: 'g3', name: 'Egg' },
+    { ...bawang, id: 'g4', name: '  Lemon jam  ', category: 'Others' },
+    { ...bawang, id: 'g5', name: '    ' }, { ...bawang, id: 'g6', category: 'Invalid' },
+    { ...bawang, id: 'g7', name: 'x'.repeat(pantryNameLimit + 1) }, garlic,
+  ]
+  const originalGrocery = structuredClone(grocery)
+  const generatedId = '00000000-0000-4000-8000-000000000004'
+  context.mock.method(crypto, 'randomUUID', () => generatedId)
+  crypto.randomUUID.mock.mockImplementationOnce(() => pantry[0].id)
+  const plan = planPurchasedTransfer(pantry, grocery)
+  assert.deepEqual(plan.restocked, [{ ...pantry[0], isAvailable: true }])
+  assert.deepEqual(plan.alreadyAvailable, [pantry[3]])
+  assert.deepEqual(plan.created, [{ id: generatedId, name: 'Lemon jam', category: 'Others', isAvailable: true }])
+  assert.deepEqual(plan.ingredients, [...plan.restocked, ...pantry.slice(1), ...plan.created])
+  assert.deepEqual([...plan.representedIds], [bawang.id, 'g2', 'g3', 'g4'])
+  assert.deepEqual(plan.skipped, grocery.slice(4, 7))
+  assert.deepEqual(pantry, original)
+  assert.deepEqual(grocery, originalGrocery)
+  assert.equal(planPurchasedTransfer(pantry, [garlic]).ingredients, pantry)
+  const repeated = planPurchasedTransfer(plan.ingredients, grocery)
+  assert.equal(repeated.ingredients, plan.ingredients)
+  assert.equal(repeated.alreadyAvailable.length, 3)
+})
+
+const pantryKey = 'lutong-ina-pantry'
+const savedIngredient = { id: 'pantry-garlic', name: 'Garlic', category: 'Vegetables', isAvailable: false }
+
+const installTransfer = (context, pantryIngredients = [savedIngredient]) => {
+  const { storage, values } = installStorage(context, JSON.stringify([garlic, bawang]))
+  values.set(pantryKey, JSON.stringify(pantryIngredients))
+  let pantry = loadPantry()
+  let grocery = loadGroceryList()
+  const events = []
+  let failingKey
+  storage.setItem.mock.mockImplementation((key, value) => {
+    events.push(['write', key])
+    if (key === failingKey) throw new DOMException('Full', 'QuotaExceededError')
+    values.set(key, value)
+  })
+  const run = (confirmRemoval = () => true) => transferPurchasedItems(pantry, grocery, {
+    confirmRemoval,
+    commitPantry: (nextPantry) => { events.push(['commit', pantryKey]); pantry = nextPantry },
+    commitGrocery: (nextGrocery) => { events.push(['commit', key]); grocery = nextGrocery },
+  })
+  return {
+    run, values, events,
+    failOn: (key) => { failingKey = key },
+    state: () => ({ pantry, grocery }),
+    setStatus: (pantryStatus, groceryStatus) => {
+      pantry = { ...pantry, storageStatus: pantryStatus }
+      grocery = { ...grocery, storageStatus: groceryStatus }
+    },
+  }
+}
+
+test('transfer protects unreadable data, skips empty transfers, and writes nothing when draft discard is cancelled', (context) => {
+  const { run, events, setStatus, values } = installTransfer(context)
+  for (const status of ['read-failed', 'invalid', 'partial']) {
+    setStatus(status, 'ready')
+    assert.equal(run().status, 'pantry-protected')
+    setStatus('ready', status)
+    assert.equal(run().status, 'grocery-protected')
+  }
+  setStatus('ready', 'ready')
+  assert.equal(run((ids) => { assert.deepEqual([...ids], [bawang.id]); return false }).status, 'cancelled')
+  assert.deepEqual(events, [])
+  assert.equal(values.get('unrelated'), 'keep')
+})
+
+test('pantry failure preserves both lists, and retry saves pantry before committing grocery cleanup', (context) => {
+  const { run, events, state, failOn, values } = installTransfer(context)
+  failOn(pantryKey)
+  assert.equal(run().status, 'pantry-failed')
+  assert.deepEqual(events, [['write', pantryKey], ['commit', pantryKey]])
+  assert.deepEqual(state().pantry.ingredients, [savedIngredient])
+  assert.deepEqual(state().grocery.items, [garlic, bawang])
+  assert.deepEqual(JSON.parse(values.get(key)), [garlic, bawang])
+  events.length = 0
+  failOn(undefined)
+  assert.equal(run().status, 'transferred')
+  assert.deepEqual(events, [['write', pantryKey], ['commit', pantryKey], ['write', key], ['commit', key]])
+  assert.deepEqual(state().grocery.items, [garlic])
+  assert.equal(run().status, 'empty')
+})
+
+test('grocery cleanup failure leaves purchased items in memory and storage, and retry writes only groceries', (context) => {
+  const { run, events, failOn, values, state } = installTransfer(context)
+  failOn(key)
+  assert.equal(run().status, 'grocery-failed')
+  assert.deepEqual(events, [['write', pantryKey], ['commit', pantryKey], ['write', key], ['commit', key]])
+  assert.equal(state().grocery.storageStatus, 'quota-exceeded')
+  assert.deepEqual(state().grocery.items, [garlic, bawang])
+  assert.deepEqual(JSON.parse(values.get(key)), [garlic, bawang])
+  assert.deepEqual(JSON.parse(values.get(pantryKey)), [{ ...savedIngredient, isAvailable: true }])
+  events.length = 0
+  failOn(undefined)
+  assert.equal(run().status, 'transferred')
+  assert.deepEqual(events, [['write', key], ['commit', key]])
+  assert.deepEqual(JSON.parse(values.get(key)), [garlic])
+  assert.equal(values.get('unrelated'), 'keep')
+})
+
+test('already available items require a pantry write when pantry status is unreliable', (context) => {
+  const { run, events, setStatus } = installTransfer(context, [{ ...savedIngredient, isAvailable: true }])
+  setStatus('write-failed', 'ready')
+  assert.equal(run().status, 'transferred')
+  assert.deepEqual(events, [['write', pantryKey], ['commit', pantryKey], ['write', key], ['commit', key]])
 })

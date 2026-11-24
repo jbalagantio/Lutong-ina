@@ -367,6 +367,27 @@ h1 {
   font-size: 0.875rem;
 }
 
+.grocery-transfer,
+.grocery-transfer-feedback:not(:empty) {
+  margin-top: 0.65rem;
+}
+
+.grocery-purchase {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
+}
+
+.grocery-purchase input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--orange);
+  cursor: pointer;
+}
+
 .grocery-group h3 {
   margin-bottom: 0.35rem;
   font-size: 0.95rem;

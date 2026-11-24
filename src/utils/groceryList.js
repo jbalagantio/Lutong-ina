@@ -1,4 +1,4 @@
-import { getIngredientMatchName, matchesIngredientSearch, normalizeIngredientName, pantryCategories, pantryNameLimit, wouldDuplicateIngredient } from './pantry.js'
+import { getIngredientMatchName, matchesIngredientSearch, normalizeIngredientName, pantryCategories, pantryNameLimit, savePantry, wouldDuplicateIngredient } from './pantry.js'
 
 const storageKey = 'lutong-ina-grocery-list'
 
@@ -121,6 +121,88 @@ export const removeGroceryItem = (items, id) => {
   return items.filter((item) => item.id !== id)
 }
 
+export const setGroceryPurchased = (items, id, isPurchased) => {
+  if (typeof id !== 'string' || !id.trim() || typeof isPurchased !== 'boolean') return items
+  const current = items.find((item) => item.id === id)
+  if (!current || current.isPurchased === isPurchased) return items
+  return items.map((item) => item === current ? { ...item, isPurchased } : item)
+}
+
+export const planPurchasedTransfer = (ingredients, groceryItems) => {
+  const usedIds = new Set(ingredients.map((ingredient) => ingredient.id))
+  const representedIds = new Set()
+  const representedNames = new Set()
+  const created = []
+  const restocked = []
+  const alreadyAvailable = []
+  const skipped = []
+  for (const item of groceryItems) {
+    if (item?.isPurchased !== true) continue
+    const name = typeof item.name === 'string' ? item.name.trim() : ''
+    if (typeof item.id !== 'string' || !item.id.trim() || getNameError(name) || !pantryCategories.includes(item.category)) {
+      skipped.push(item)
+      continue
+    }
+
+    representedIds.add(item.id)
+    const canonicalName = getIngredientMatchName(name)
+    if (representedNames.has(canonicalName)) continue
+    representedNames.add(canonicalName)
+
+    const matches = ingredients.filter((ingredient) => getIngredientMatchName(ingredient.name) === canonicalName)
+    const available = matches.find((ingredient) => ingredient.isAvailable)
+    if (available) {
+      alreadyAvailable.push(available)
+    } else if (matches.length > 0) {
+      // When no match is available, restock the first record in pantry order.
+      restocked.push({ ...matches[0], isAvailable: true })
+    } else {
+      const id = makeUniqueId(usedIds)
+      usedIds.add(id)
+      created.push({ id, name, category: item.category, isAvailable: true })
+    }
+  }
+
+  let nextIngredients = ingredients
+  if (created.length > 0 || restocked.length > 0) {
+    const restockedById = new Map(restocked.map((ingredient) => [ingredient.id, ingredient]))
+    nextIngredients = [...ingredients.map((ingredient) => restockedById.get(ingredient.id) ?? ingredient), ...created]
+  }
+  return { ingredients: nextIngredients, created, restocked, alreadyAvailable, representedIds, skipped }
+}
+
+const isProtected = (status) => status === 'read-failed' || status === 'invalid' || status === 'partial'
+
+export const transferPurchasedItems = (pantry, grocery, { confirmRemoval, commitPantry, commitGrocery }) => {
+  if (!grocery.items.some((item) => item.isPurchased)) return { status: 'empty' }
+  if (isProtected(pantry.storageStatus)) return { status: 'pantry-protected' }
+  if (isProtected(grocery.storageStatus)) return { status: 'grocery-protected' }
+
+  const plan = planPurchasedTransfer(pantry.ingredients, grocery.items)
+  if (plan.representedIds.size === 0) return { status: 'empty', skipped: plan.skipped }
+  if (!confirmRemoval(plan.representedIds)) return { status: 'cancelled' }
+
+  // A previous write failure means even an unchanged pantry must be saved before cleanup.
+  if (plan.ingredients !== pantry.ingredients || pantry.storageStatus !== 'ready') {
+    const storageStatus = savePantry({ ...pantry, ingredients: plan.ingredients })
+    if (storageStatus !== 'ready') {
+      commitPantry({ ...pantry, storageStatus })
+      return { status: 'pantry-failed', storageStatus }
+    }
+    commitPantry({ ingredients: plan.ingredients, storageStatus })
+  }
+
+  const items = grocery.items.filter((item) => !plan.representedIds.has(item.id))
+  const storageStatus = saveGroceryList({ ...grocery, items })
+  if (storageStatus !== 'ready') {
+    commitGrocery({ ...grocery, storageStatus })
+    return { ...plan, status: 'grocery-failed', storageStatus }
+  }
+
+  commitGrocery({ items, storageStatus })
+  return { ...plan, status: 'transferred' }
+}
+
 export const filterGroceryItems = (items, search, category) => {
   const term = normalizeIngredientName(search)
   return items.filter((item) => (
@@ -182,7 +264,7 @@ export const loadGroceryList = () => {
 }
 
 export const saveGroceryList = ({ items, storageStatus }) => {
-  if (storageStatus === 'read-failed' || storageStatus === 'invalid' || storageStatus === 'partial') {
+  if (isProtected(storageStatus)) {
     return storageStatus
   }
 
