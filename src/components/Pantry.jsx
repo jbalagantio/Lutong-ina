@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { matchesIngredientSearch, normalizeIngredientName, pantryCategories } from '../utils/pantry.js'
 import PantryForm from './PantryForm.jsx'
 
@@ -14,45 +14,64 @@ const Pantry = ({
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [availabilityFilter, setAvailabilityFilter] = useState('')
+  const addButton = useRef(null)
+  const formTrigger = useRef(null)
+  const availabilitySelect = useRef(null)
 
   const availableCount = ingredients.filter((ingredient) => ingredient.isAvailable).length
   const outOfStockCount = ingredients.length - availableCount
   const searchTerm = normalizeIngredientName(search)
-  const visibleIngredients = ingredients.filter((ingredient) => {
+  const matchesFilters = (ingredient) => {
     const nameMatches = matchesIngredientSearch(ingredient.name, searchTerm)
     const categoryMatches = !categoryFilter || ingredient.category === categoryFilter
     const availability = ingredient.isAvailable ? 'available' : 'out-of-stock'
     const availabilityMatches = !availabilityFilter || availability === availabilityFilter
     return nameMatches && categoryMatches && availabilityMatches
-  })
+  }
+  const visibleIngredients = ingredients.filter(matchesFilters)
   const editingIngredient = ingredients.find((ingredient) => ingredient.id === editingId)
 
-  const handleOpenAdd = () => {
+  const handleOpenAdd = (event) => {
+    formTrigger.current = event.currentTarget
     setEditingId(null)
     setIsAdding(true)
   }
 
-  const handleOpenEdit = (id) => {
+  const handleOpenEdit = (id, event) => {
+    formTrigger.current = event.currentTarget
     setIsAdding(false)
     setEditingId(id)
   }
 
-  const handleCloseForm = () => {
+  const handleCloseForm = (focusTarget = formTrigger.current) => {
     setIsAdding(false)
     setEditingId(null)
+    const nextFocus = focusTarget?.isConnected ? focusTarget : addButton.current
+    nextFocus?.focus()
+    formTrigger.current = null
   }
 
   const handleSaveEdit = (values) => {
+    const updatedIngredient = { ...editingIngredient, ...values }
     onEditIngredient(editingId, values)
-    handleCloseForm()
+    handleCloseForm(matchesFilters(updatedIngredient) ? formTrigger.current : addButton.current)
   }
 
   const handleConfirmRemove = (ingredient) => {
     if (window.confirm(`Remove "${ingredient.name}" from your pantry?`)) {
       onRemoveIngredient(ingredient.id)
       if (editingId === ingredient.id) {
-        handleCloseForm()
+        handleCloseForm(addButton.current)
+      } else {
+        addButton.current?.focus()
       }
+    }
+  }
+
+  const handleToggleAvailability = (id) => {
+    onToggleAvailability(id)
+    if (availabilityFilter) {
+      availabilitySelect.current?.focus()
     }
   }
 
@@ -60,7 +79,7 @@ const Pantry = ({
     <section className="pantry-panel" aria-labelledby="pantry-heading">
       <div className="pantry-header">
         <h1 id="pantry-heading">My Pantry</h1>
-        <button className="pantry-button pantry-primary" type="button" onClick={handleOpenAdd}>
+        <button ref={addButton} className="pantry-button pantry-primary" type="button" onClick={handleOpenAdd}>
           Add ingredient
         </button>
       </div>
@@ -68,14 +87,14 @@ const Pantry = ({
         <li className="pantry-available"><strong>{availableCount}</strong> available</li>
         <li><strong>{outOfStockCount}</strong> out of stock</li>
       </ul>
-      {isAdding && <PantryForm key="add" ingredients={ingredients} onSave={onAddIngredient} onCancel={handleCloseForm} />}
+      {isAdding && <PantryForm key="add" ingredients={ingredients} onSave={onAddIngredient} onCancel={() => handleCloseForm()} />}
       {editingIngredient && (
         <PantryForm
           key={editingIngredient.id}
           ingredient={editingIngredient}
           ingredients={ingredients}
           onSave={handleSaveEdit}
-          onCancel={handleCloseForm}
+          onCancel={() => handleCloseForm()}
         />
       )}
       <div className="pantry-fields pantry-filters" role="group" aria-label="Filter ingredients">
@@ -92,7 +111,7 @@ const Pantry = ({
         </label>
         <label>
           <span className="visually-hidden">Filter by availability</span>
-          <select value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)}>
+          <select ref={availabilitySelect} value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)}>
             <option value="">All statuses</option>
             <option value="available">Available</option>
             <option value="out-of-stock">Out of stock</option>
@@ -123,7 +142,7 @@ const Pantry = ({
                       role="switch"
                       aria-label={`Available: ${ingredient.name}`}
                       checked={ingredient.isAvailable}
-                      onChange={() => onToggleAvailability(ingredient.id)}
+                      onChange={() => handleToggleAvailability(ingredient.id)}
                     />
                     <span className={ingredient.isAvailable ? 'pantry-available' : undefined} aria-hidden="true">{status}</span>
                   </label>
@@ -132,7 +151,7 @@ const Pantry = ({
                     type="button"
                     aria-label={`Edit ${ingredient.name}`}
                     title="Edit"
-                    onClick={() => handleOpenEdit(ingredient.id)}
+                    onClick={(event) => handleOpenEdit(ingredient.id, event)}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="m14 6 4 4M4 20l1-5L16 4a2.8 2.8 0 0 1 4 4L9 19z" />
