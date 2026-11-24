@@ -33,6 +33,7 @@ import {
 } from './utils/groceryList.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
+  addCookingRecency,
   advanceRecommendationSession,
   getEligibleRecommendations,
   getRecommendationCatalog,
@@ -53,9 +54,9 @@ const storageWarnings = {
   'quota-exceeded': 'Browser storage is full. Pantry changes could not be saved.',
 }
 
-const getDishesMatches = (ingredients, dishes) => {
+const getDishesMatches = (ingredients, dishes, history) => {
   const catalog = getRecommendationCatalog(recipes, dishes.personalRecipes)
-  return getRecipeMatches(catalog, ingredients)
+  return addCookingRecency(getRecipeMatches(catalog, ingredients), history.records)
 }
 
 const App = ({ canReconcilePhotos }) => {
@@ -198,7 +199,7 @@ const App = ({ canReconcilePhotos }) => {
     latestPantry.current = nextPantry
     setPantry(nextPantry)
     if (ingredientsChanged && activeScreen === 'home') {
-      const matches = getDishesMatches(nextPantry.ingredients, latestDishes.current)
+      const matches = getDishesMatches(nextPantry.ingredients, latestDishes.current, latestHistory.current)
       setRecommendationSession((session) => (
         session.mode === 'pantry' ? refreshPantryRound(session, matches) : session
       ))
@@ -618,7 +619,7 @@ const App = ({ canReconcilePhotos }) => {
     }
     if (screen === 'home') {
       const dishes = latestDishes.current
-      const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
+      const matches = getDishesMatches(latestPantry.current.ingredients, dishes, latestHistory.current)
       const randomValue = Math.random()
       setRecommendationSession((session) => (
         refreshRecommendationRound(session, session.mode, matches, randomValue, dishes.libraryEntries)
@@ -639,14 +640,14 @@ const App = ({ canReconcilePhotos }) => {
 
   const handleSelectMode = (mode) => {
     const dishes = latestDishes.current
-    const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
+    const matches = getDishesMatches(latestPantry.current.ingredients, dishes, latestHistory.current)
     const randomValue = Math.random()
     setRecommendationSession((session) => selectCookingMode(session, mode, matches, randomValue, dishes.libraryEntries))
   }
 
   const handleSuggestionAction = (restart) => {
     const dishes = latestDishes.current
-    const matches = getDishesMatches(latestPantry.current.ingredients, dishes)
+    const matches = getDishesMatches(latestPantry.current.ingredients, dishes, latestHistory.current)
     const randomValue = Math.random()
     setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart, dishes.libraryEntries))
   }
@@ -726,7 +727,7 @@ const App = ({ canReconcilePhotos }) => {
     )
   } else {
     const { mode, rounds } = recommendationSession
-    const matches = mode ? getDishesMatches(pantry.ingredients, myDishes) : []
+    const matches = mode ? getDishesMatches(pantry.ingredients, myDishes, cookingHistory) : []
     const pool = mode === 'new'
       ? getSomethingNewPool(matches, myDishes.libraryEntries)
       : { matches: getEligibleRecommendations(mode, matches), isFallback: false }

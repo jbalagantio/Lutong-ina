@@ -35,7 +35,7 @@ New items use the first matching pantry record with a valid category, in display
 
 Both Pantry views keep their drafts and filters when switching. Leaving Pantry with a changed grocery draft asks for confirmation. Accepted grocery changes save to `lutong-ina-grocery-list` in the current browser. Loading does not write on startup. After a failed read, retry merges saved items with the surviving session items, assigns new IDs to colliding session items, and keeps valid legacy aliases. Invalid or partial storage stays protected until confirmed replacement. If saving fails, current changes stay in memory and can be lost on refresh. Grocery storage is local to this browser and does not synchronize concurrent edits across tabs.
 
-Use **Mark as cooked** on a Home recommendation, in Discover recipe details, or on an expanded recipe in My Dishes. To record it again from the same open recipe, choose **Record another meal** and confirm. Each event stores the recipe ID, its name at the time, and a UTC timestamp. It leaves bookmarks, preferences, pantry availability, grocery items, and recommendation ranking alone.
+Use **Mark as cooked** on a Home recommendation, in Discover recipe details, or on an expanded recipe in My Dishes. To record it again from the same open recipe, choose **Record another meal** and confirm. Each event stores the recipe ID, its name at the time, and a UTC timestamp. It leaves bookmarks, preferences, pantry availability, and grocery items alone. The current recommendation stays visible.
 
 Open **My Dishes → Cooking History** to search name snapshots and remove individual events. Meals appear newest first, grouped by your device's local date. Name changes and recipe deletions leave past entries intact. Cooking History and Recipe Library preserve open recipe drafts when switching views.
 
@@ -45,11 +45,15 @@ The 15 built-in recipes include preparation, cooking order, approximate timings,
 
 Choose one of three cooking modes on **Home**:
 
-- **Use what I have** ranks dishes with at least one match by ingredient coverage, fewest missing ingredients, shortest cooking time, and recipe name.
+- **Use what I have** suggests dishes with at least one tracked ingredient available in Pantry.
 - **I'll go grocery shopping** draws from the full catalog and shows which ingredients to shop for.
 - **Something new** draws from recipes not marked familiar. If all recipes are marked familiar, it draws from the full catalog. Each round avoids repeats.
 
 Home recommendations include all built-in and personal recipes. Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Each cooking mode keeps its own suggestion round while you navigate. Refreshing starts a new session. If a suggestion becomes ineligible, the app moves to an eligible unseen recipe when one exists. Pantry data stays in this browser, and the app shows a warning if storage fails.
+
+Home uses rule-based cooking history. From highest to lowest priority, the groups are recipes with no recorded meal, last cooked at least 7 local calendar days ago, 3–6 days ago, 1–2 days ago, and today. The latest valid event for each recipe ID determines its group, including events still in memory. Future timestamps receive today's priority without a date label. Groups are based on device-local dates and are recalculated when a recommendation is drawn.
+
+**Use what I have** ranks by unrounded coverage, then missing ingredient count, recency group, cooking time, and name. **I'll go grocery shopping** picks randomly among unseen recipes in the highest available group. **Something new** applies that same draw within the unfamiliar pool, or across the full catalog when all recipes are familiar. Lower-priority recipes remain eligible. History updates affect subsequent draws within each round. Starting a new round skips the last suggestion when another eligible dish exists.
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 

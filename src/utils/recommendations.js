@@ -1,4 +1,26 @@
 import { getIngredientMatchName } from './pantry.js'
+import { getDaysSinceCooking, getLatestCookingTimes } from './cookingHistory.js'
+
+export const addCookingRecency = (matches, history, referenceDate = new Date()) => {
+  const latestByRecipe = getLatestCookingTimes(history)
+  return matches.map((match) => {
+    const cookedAt = latestByRecipe.get(match.recipe.id)
+    return {
+      ...match,
+      daysSinceCooked: getDaysSinceCooking(cookedAt, referenceDate),
+      cookedInFuture: cookedAt > referenceDate.getTime(),
+    }
+  })
+}
+
+const recencyPriority = (match) => {
+  const days = match.daysSinceCooked
+  if (days == null) return 0
+  if (days >= 7) return 1
+  if (days >= 3) return 2
+  if (days >= 1) return 3
+  return 4
+}
 
 export const getAvailableIngredientNames = (pantryIngredients) => {
   const availableNames = new Set()
@@ -46,6 +68,8 @@ export const rankPantryRecommendations = (matches) => {
     if (first.missingIngredients.length !== second.missingIngredients.length) {
       return first.missingIngredients.length - second.missingIngredients.length
     }
+    const byRecency = recencyPriority(first) - recencyPriority(second)
+    if (byRecency !== 0) return byRecency
     if (first.recipe.cookingTime !== second.recipe.cookingTime) {
       return first.recipe.cookingTime - second.recipe.cookingTime
     }
@@ -80,8 +104,14 @@ export const selectNextRecommendation = (matches, suggestedIds, randomValue = 0)
   if (remainingMatches.length === 0) {
     return null
   }
-  const randomIndex = Math.floor(randomValue * remainingMatches.length)
-  return remainingMatches[randomIndex]
+  const bestPriority = remainingMatches.reduce((best, match) => Math.min(best, recencyPriority(match)), Infinity)
+  const pool = remainingMatches.filter((match) => recencyPriority(match) === bestPriority)
+  return pool[Math.floor(randomValue * pool.length)]
+}
+
+const selectForMode = (mode, eligible, suggestedIds, randomValue) => {
+  if (mode === 'pantry') return eligible.find((match) => !suggestedIds.includes(match.recipe.id))
+  return selectNextRecommendation(eligible, suggestedIds, randomValue)
 }
 
 const updateRound = (session, mode, round) => ({
@@ -112,7 +142,7 @@ export const selectCookingMode = (session, mode, matches, randomValue, libraryEn
   }
 
   const eligible = getEligibleRecommendations(mode, matches, libraryEntries)
-  const match = selectNextRecommendation(eligible, [], mode === 'pantry' ? 0 : randomValue)
+  const match = selectForMode(mode, eligible, [], randomValue)
   return updateRound(nextSession, mode, appendSuggestion([], match))
 }
 
@@ -124,9 +154,8 @@ export const advanceRecommendationSession = (session, matches, randomValue, rest
   }
 
   const eligible = getEligibleRecommendations(mode, matches, libraryEntries)
-  const selectionValue = mode === 'pantry' ? 0 : randomValue
   if (!restart) {
-    const nextMatch = selectNextRecommendation(eligible, round.suggestedIds, selectionValue)
+    const nextMatch = selectForMode(mode, eligible, round.suggestedIds, randomValue)
     return nextMatch ? updateRound(session, mode, appendSuggestion(round.suggestedIds, nextMatch)) : session
   }
 
@@ -135,8 +164,8 @@ export const advanceRecommendationSession = (session, matches, randomValue, rest
     return session
   }
 
-  const excludedIds = mode !== 'pantry' && eligible.length > 1 ? [round.currentId] : []
-  const firstMatch = selectNextRecommendation(eligible, excludedIds, selectionValue)
+  const excludedIds = eligible.length > 1 ? [round.currentId] : []
+  const firstMatch = selectForMode(mode, eligible, excludedIds, randomValue)
   return updateRound(session, mode, appendSuggestion([], firstMatch))
 }
 
@@ -151,7 +180,7 @@ export const refreshRecommendationRound = (session, mode, matches, randomValue, 
     return session
   }
 
-  const nextMatch = selectNextRecommendation(eligible, round.suggestedIds, mode === 'pantry' ? 0 : randomValue)
+  const nextMatch = selectForMode(mode, eligible, round.suggestedIds, randomValue)
   if (!nextMatch && round.currentId === null) {
     return session
   }

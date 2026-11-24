@@ -67,6 +67,30 @@ export const searchCookingHistory = (records, search) => {
 
 export const countCookedDishes = (records) => new Set(records.map((record) => record.recipeId)).size
 
+export const getLatestCookingTimes = (records) => {
+  const latestByRecipe = new Map()
+  for (const record of records) {
+    if (!isValidCookingRecord(record)) continue
+    const cookedAt = Date.parse(record.cookedAt)
+    if (!latestByRecipe.has(record.recipeId) || cookedAt > latestByRecipe.get(record.recipeId)) {
+      latestByRecipe.set(record.recipeId, cookedAt)
+    }
+  }
+  return latestByRecipe
+}
+
+const localCalendarDay = (date) => {
+  // Compare local date labels on a UTC scale so daylight-saving days still count as one day.
+  const day = new Date(0)
+  day.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate())
+  return day.getTime() / (24 * 60 * 60 * 1000)
+}
+
+export const getDaysSinceCooking = (cookedAt, referenceDate = new Date()) => {
+  if (cookedAt === undefined) return null
+  return Math.max(0, localCalendarDay(referenceDate) - localCalendarDay(new Date(cookedAt)))
+}
+
 export const recoverCookingRecords = (savedRecords, sessionRecords) => {
   const savedIds = new Set(savedRecords.map((record) => record.id))
   const usedIds = new Set([...savedIds, ...sessionRecords.map((record) => record.id)])

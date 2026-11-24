@@ -2,6 +2,13 @@ import RecipeImage from './RecipeImage.jsx'
 
 const RecommendationCard = ({ match, recipeActions }) => {
   const { recipe, matchedIngredients, missingIngredients, matchedCount, trackedCount, matchPercentage } = match
+  const { daysSinceCooked, cookedInFuture } = match
+  let historyLabel = ''
+  if (daysSinceCooked != null && !cookedInFuture) {
+    if (daysSinceCooked === 0) historyLabel = 'Cooked today'
+    else if (daysSinceCooked === 1) historyLabel = 'Cooked yesterday'
+    else historyLabel = `Last cooked ${daysSinceCooked} days ago`
+  }
 
   return (
     <article className="recommendation-card" aria-labelledby="recipe-heading">
@@ -11,6 +18,7 @@ const RecommendationCard = ({ match, recipeActions }) => {
         <li>{recipe.cookingTime} min</li>
         <li>{recipe.difficulty}</li>
         <li>{recipe.servings} servings</li>
+        {historyLabel && <li>{historyLabel}</li>}
       </ul>
       <p>{recipe.description}</p>
       {trackedCount > 0 ? (
