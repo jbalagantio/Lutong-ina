@@ -190,7 +190,7 @@ const App = ({ canReconcilePhotos }) => {
     if (added.length > 0) {
       storageStatus = saveAndCommitGroceryList({ ...current, items, hasUnsavedChanges: true })
     }
-    return { added: added.length, listed: alreadyListed.length, skipped: skipped.length, storageStatus }
+    return { items, added: added.length, listed: alreadyListed.length, skipped: skipped.length, storageStatus }
   }
 
   const handleRemoveGroceryItem = (id) => {
@@ -493,7 +493,7 @@ const App = ({ canReconcilePhotos }) => {
   }
 
   const renderGroceryAction = (match) => (
-    <RecipeGroceryAction key={match.recipe.id} match={match} groceryList={groceryList}
+    <RecipeGroceryAction key={match.recipe.id} match={match} pantryIngredients={pantry.ingredients} groceryList={groceryList}
       onAdd={handleAddRecipeGroceries}
       onView={(event) => handleNavigate('pantry', event.currentTarget, 'grocery')} />
   )
