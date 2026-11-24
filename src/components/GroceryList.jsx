@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { filterGroceryItems, groceryStorageWarnings, groceryUnsavedWarning } from '../utils/groceryList.js'
-import { pantryCategories } from '../utils/pantry.js'
+import { getIngredientMatchName, pantryCategories } from '../utils/pantry.js'
 import GroceryItemForm from './GroceryItemForm.jsx'
 
 const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onSave, onRemove, onPurchase, onTransfer, onDraftChange }) => {
@@ -29,9 +29,14 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
   const warning = groceryStorageWarnings[storageStatus]
   const showPantryRecovery = pantryStorageStatus !== 'ready' &&
     ['pantry-protected', 'pantry-failed'].includes(transferResult?.status)
-  const showGroceryRecovery = warning && ['grocery-protected', 'grocery-failed'].includes(transferResult?.status)
-  const resolvedBlock = (transferResult?.status === 'pantry-protected' && !showPantryRecovery) ||
-    (transferResult?.status === 'grocery-protected' && !showGroceryRecovery)
+  const hasPendingCleanup = transferResult?.status === 'grocery-failed' && items.some((item) => (
+    item.isPurchased && transferResult.pendingNames.get(item.id) === getIngredientMatchName(item.name)
+  ))
+  const showGroceryRecovery = warning && (transferResult?.status === 'grocery-protected' || hasPendingCleanup)
+  const showTransferFeedback = transferResult &&
+    (!['pantry-protected', 'pantry-failed'].includes(transferResult.status) || showPantryRecovery) &&
+    (transferResult.status !== 'grocery-protected' || showGroceryRecovery) &&
+    (transferResult.status !== 'grocery-failed' || hasPendingCleanup)
 
   useLayoutEffect(() => {
     const id = pendingPurchaseFocus.current
@@ -46,10 +51,22 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
     else purchaseInputs.current.delete(id)
   }
 
+  const clearTransferFeedback = (changedId, currentName) => {
+    // A grocery save can succeed without completing a previously failed cleanup.
+    setTransferResult((previous) => {
+      if (previous?.status !== 'grocery-failed') return null
+      const pendingName = previous.pendingNames.get(changedId)
+      if (!pendingName || pendingName === currentName) return previous
+      const pendingNames = new Map(previous.pendingNames)
+      pendingNames.delete(changedId)
+      return pendingNames.size > 0 ? { ...previous, pendingNames } : null
+    })
+  }
+
   const changePurchase = (item, isPurchased) => {
     if (!onPurchase(item.id, isPurchased)) return
     pendingPurchaseFocus.current = item.id
-    setTransferResult(null)
+    clearTransferFeedback(item.id, isPurchased ? getIngredientMatchName(item.name) : undefined)
   }
 
   const retry = () => {
@@ -60,12 +77,16 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
       formTrigger.current = null
     }
     if (status === 'ready' || (storageStatus === 'read-failed' && status !== 'read-failed')) {
+      clearTransferFeedback()
       heading.current?.focus()
     }
   }
 
   const replace = () => {
-    if (onReplace()) heading.current?.focus()
+    if (onReplace()) {
+      clearTransferFeedback()
+      heading.current?.focus()
+    }
   }
 
   const updateDraftChanged = (changed) => {
@@ -104,6 +125,7 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
   const saveItem = (values) => {
     const result = onSave(values, editor.id)
     if (!result.error) {
+      clearTransferFeedback(result.item.id, getIngredientMatchName(result.item.name))
       const remainsVisible = filterGroceryItems([result.item], search, category).length > 0
       setAnnouncement(editor.item ? `Updated ${result.item.name}.` : `Added ${result.item.name}.`)
       closeEditor(remainsVisible ? formTrigger.current : searchInput.current)
@@ -120,6 +142,7 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
       return
     }
     onRemove(item.id)
+    clearTransferFeedback(item.id)
     setAnnouncement(`Removed ${item.name}.`)
     if (closesEditor) closeEditor(addButton.current)
     else addButton.current?.focus()
@@ -150,7 +173,13 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
     if (result.restocked?.length) message += ` ${result.restocked.length} restocked.`
     if (result.alreadyAvailable?.length) message += ` ${result.alreadyAvailable.length} already available.`
     if (result.skipped?.length) message += ` ${result.skipped.length} skipped.`
-    setTransferResult({ status: result.status, message })
+    const pendingNames = new Map()
+    if (result.status === 'grocery-failed') {
+      for (const item of items) {
+        if (result.representedIds.has(item.id)) pendingNames.set(item.id, getIngredientMatchName(item.name))
+      }
+    }
+    setTransferResult({ status: result.status, message, pendingNames })
     if (result.status === 'transferred' && result.representedIds.has(editor?.id)) {
       closeEditor(transferFeedback.current)
     } else {
@@ -201,7 +230,7 @@ const GroceryList = ({ groceryList, pantryStorageStatus, onRetry, onReplace, onS
       </div>
       <p className="visually-hidden" role="status">{announcement}</p>
       <p className="grocery-transfer-feedback" role="status" tabIndex={-1} ref={transferFeedback}>
-        {!resolvedBlock && transferResult?.message}
+        {showTransferFeedback && transferResult.message}
       </p>
       {showPantryRecovery && (
         <a href="#pantry-storage-warning">Pantry storage options</a>
