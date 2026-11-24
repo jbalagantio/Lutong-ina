@@ -855,9 +855,115 @@ h1 {
   margin-top: 0;
 }
 
+.discover-recipe-opening {
+  position: relative;
+  display: grid;
+  gap: 0.55rem;
+}
+
 .discover-recipe h2 {
-  margin-top: 0.2rem;
   font-size: clamp(1.35rem, 2.2vw, 1.65rem);
+}
+
+.discover-recipe-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.discover-recipe-open::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+
+.discover-recipe-opening:hover .discover-recipe-open {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.discover-back {
+  margin-bottom: 1.25rem;
+}
+
+.recipe-detail-overview,
+.recipe-detail-body {
+  display: grid;
+  gap: 1.5rem;
+  overflow-wrap: anywhere;
+}
+
+.recipe-detail-overview header {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.recipe-detail-overview .recipe-photo-landscape {
+  margin-bottom: 0;
+}
+
+.recipe-detail-body {
+  margin-top: 1.75rem;
+}
+
+.recipe-detail-body h2 {
+  margin-bottom: 0.75rem;
+  font-size: clamp(1.35rem, 2.2vw, 1.65rem);
+}
+
+.recipe-detail-ingredients,
+.recipe-detail-instructions {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.recipe-detail-ingredients {
+  padding: 0;
+  list-style: none;
+}
+
+.recipe-detail-ingredients li {
+  display: grid;
+  grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
+.recipe-detail-ingredients li > span:first-child {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-detail-instructions {
+  max-width: 65ch;
+  padding-inline-start: 1.5rem;
+}
+
+.recipe-detail-instructions li {
+  padding-inline-start: 0.25rem;
+}
+
+.recipe-detail-instructions li::marker {
+  color: var(--orange);
+  font-weight: 650;
+}
+
+@media (min-width: 48rem) {
+  .recipe-detail-overview {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: start;
+  }
+
+  .recipe-detail-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+  }
 }
 
 @media (min-width: 30rem) {

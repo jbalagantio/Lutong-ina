@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import recipes from '../data/recipes.js'
 import { filterDiscoverRecipes, getDiscoverFilterOptions } from '../utils/discover.js'
 import DiscoverRecipeCard from './DiscoverRecipeCard.jsx'
+import RecipeDetails from './RecipeDetails.jsx'
 
 const { cuisines, difficulties } = getDiscoverFilterOptions(recipes)
 const cookingTimeLimits = [30, 60, 90]
@@ -9,9 +10,35 @@ const defaultFilters = { query: '', cuisine: '', maxTime: '', difficulty: '' }
 
 const Discover = () => {
   const [filters, setFilters] = useState(defaultFilters)
+  const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const searchInput = useRef(null)
+  const detailHeading = useRef(null)
+  const catalogReturn = useRef(null)
+  const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId)
   const results = filterDiscoverRecipes(recipes, filters)
   const hasActiveFilters = filters.query.trim() || filters.cuisine || filters.maxTime || filters.difficulty
+
+  useLayoutEffect(() => {
+    if (selectedRecipeId) {
+      detailHeading.current?.focus({ preventScroll: true })
+      window.scrollTo(0, 0)
+      return
+    }
+
+    const previousCatalog = catalogReturn.current
+    if (!previousCatalog) return
+
+    catalogReturn.current = null
+    const opener = document.getElementById(`discover-open-${previousCatalog.recipeId}`)
+    const focusTarget = opener ?? searchInput.current
+    focusTarget?.focus({ preventScroll: true })
+    window.scrollTo(0, opener ? previousCatalog.scrollTop : 0)
+  }, [selectedRecipeId])
+
+  const openRecipe = (recipeId) => {
+    catalogReturn.current = { recipeId, scrollTop: window.scrollY }
+    setSelectedRecipeId(recipeId)
+  }
 
   const updateFilter = (event) => {
     const { name, value } = event.target
@@ -26,6 +53,17 @@ const Discover = () => {
   const clearFilters = () => {
     setFilters(defaultFilters)
     searchInput.current?.focus()
+  }
+
+  if (selectedRecipe) {
+    return (
+      <div className="discover-detail">
+        <button className="pantry-button discover-back" type="button" onClick={() => setSelectedRecipeId(null)}>
+          Back to Discover
+        </button>
+        <RecipeDetails recipe={selectedRecipe} headingRef={detailHeading} />
+      </div>
+    )
   }
 
   return (
@@ -75,7 +113,7 @@ const Discover = () => {
       {results.length > 0 ? (
         <ul className="discover-grid" role="list">
           {results.map((recipe) => (
-            <li key={recipe.id}><DiscoverRecipeCard recipe={recipe} /></li>
+            <li key={recipe.id}><DiscoverRecipeCard recipe={recipe} onOpen={openRecipe} /></li>
           ))}
         </ul>
       ) : (

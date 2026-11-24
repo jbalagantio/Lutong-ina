@@ -1,10 +1,17 @@
 import { recipeImages } from '../data/recipeImages.js'
 import RecipeImage, { RecipeImageCredit } from './RecipeImage.jsx'
 
-const DiscoverRecipeCard = ({ recipe }) => (
+const DiscoverRecipeCard = ({ recipe, onOpen }) => (
   <article className="discover-recipe">
-    <RecipeImage recipe={recipe} layout="catalog" />
-    <h2>{recipe.name}</h2>
+    <div className="discover-recipe-opening">
+      <RecipeImage recipe={recipe} layout="catalog" />
+      <h2>
+        <button className="discover-recipe-open" id={`discover-open-${recipe.id}`} type="button"
+          aria-label={`Open ${recipe.name}`} onClick={() => onOpen(recipe.id)}>
+          {recipe.name}
+        </button>
+      </h2>
+    </div>
     <ul className="recipe-meta" aria-label="Recipe information">
       <li>{recipe.cookingTime} min</li>
       <li>{recipe.difficulty}</li>
