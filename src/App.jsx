@@ -19,6 +19,7 @@ import {
   saveMyDishes,
   toggleRecipePreference,
 } from './utils/myDishes.js'
+import { deleteRecipePhoto, getUnusedPhotoIds, saveRecipePhoto } from './utils/recipePhotos.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -55,6 +56,9 @@ const App = () => {
   const latestDishes = useRef(myDishes)
   const pendingLibraryChanges = useRef(new Map())
   const recipeDraftChanged = useRef(false)
+  const savingPhoto = useRef(false)
+  const photosToDelete = useRef(new Set())
+  const [photoCleanupError, setPhotoCleanupError] = useState(false)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
 
@@ -166,14 +170,29 @@ const App = () => {
     }
   }
 
+  const cleanUpPhotos = async (personalRecipes) => {
+    const unused = getUnusedPhotoIds(photosToDelete.current, personalRecipes)
+    for (const photoId of unused) {
+      try {
+        await deleteRecipePhoto(photoId)
+        photosToDelete.current.delete(photoId)
+      } catch {
+        // Keep this ID queued so the user can retry cleanup.
+      }
+    }
+    setPhotoCleanupError(getUnusedPhotoIds(photosToDelete.current, latestDishes.current.personalRecipes).length > 0)
+  }
+
   const saveAndCommitMyDishes = (nextDishes, remappedRecipes) => {
     const storageStatus = saveMyDishes(nextDishes)
     const replacementError = storageStatus === 'ready' ? undefined : nextDishes.replacementError
     commitMyDishes({ ...nextDishes, storageStatus, replacementError }, remappedRecipes)
+    if (storageStatus === 'ready') void cleanUpPhotos(nextDishes.personalRecipes)
     return storageStatus
   }
 
-  const handleSavePersonalRecipe = (values, editingRecipe) => {
+  const handleSavePersonalRecipe = async (values, editingRecipe, draftPhoto) => {
+    if (savingPhoto.current) return 'A photo is already being saved.'
     const current = latestDishes.current
     const editingId = editingRecipe?.id
     const { recipe, error } = preparePersonalRecipe(values, current.personalRecipes, editingId, editingRecipe)
@@ -181,19 +200,43 @@ const App = () => {
       return error
     }
 
+    let photoId = editingRecipe?.photoId
+    if (draftPhoto) {
+      savingPhoto.current = true
+      try {
+        const stagedPhotoId = crypto.randomUUID()
+        await saveRecipePhoto(stagedPhotoId, draftPhoto)
+        photoId = stagedPhotoId
+      } catch {
+        return 'Could not save the photo. Try again or remove it from the draft.'
+      } finally {
+        savingPhoto.current = false
+      }
+    } else if (draftPhoto === null) {
+      photoId = undefined
+    }
+    if (photoId) recipe.photoId = photoId
+    if (editingRecipe?.photoId && editingRecipe.photoId !== photoId) {
+      photosToDelete.current.add(editingRecipe.photoId)
+    }
+
+    // A new photo uses a fresh key. The previous blob is kept until the recipe write succeeds.
+    const latest = latestDishes.current
     const personalRecipes = editingId
-      ? current.personalRecipes.map((item) => item.id === editingId ? recipe : item)
-      : [...current.personalRecipes, recipe]
-    saveAndCommitMyDishes({ ...current, personalRecipes })
+      ? latest.personalRecipes.map((item) => item.id === editingId ? recipe : item)
+      : [...latest.personalRecipes, recipe]
+    saveAndCommitMyDishes({ ...latest, personalRecipes })
     return ''
   }
 
   const handleDeletePersonalRecipe = (recipe) => {
+    if (savingPhoto.current) return false
     const current = latestDishes.current
     const next = deletePersonalRecipe(current, recipe)
     if (next === current) {
       return false
     }
+    if (recipe.photoId) photosToDelete.current.add(recipe.photoId)
     pendingLibraryChanges.current.delete(recipe.id)
     saveAndCommitMyDishes(next)
     return true
@@ -240,6 +283,7 @@ const App = () => {
   }
 
   const handleRetryDishes = () => {
+    if (savingPhoto.current) return
     const current = latestDishes.current
     if (current.storageStatus !== 'read-failed') {
       const status = saveAndCommitMyDishes(current)
@@ -272,6 +316,7 @@ const App = () => {
   }
 
   const handleReplaceSavedDishes = () => {
+    if (savingPhoto.current) return false
     const current = latestDishes.current
     const needsReplacement = current.storageStatus === 'invalid' || current.storageStatus === 'partial'
     if (!needsReplacement || hasDuplicateRecipeNames(current.personalRecipes)) {
@@ -284,6 +329,7 @@ const App = () => {
     const storageStatus = saveMyDishes({ ...current, storageStatus: 'ready' })
     if (storageStatus === 'ready') {
       commitMyDishes({ ...current, storageStatus, replacementError: undefined })
+      void cleanUpPhotos(current.personalRecipes)
     } else {
       commitMyDishes({ ...current, replacementError: storageStatus })
     }
@@ -291,7 +337,7 @@ const App = () => {
   }
 
   const canDiscardRecipeDraft = () =>
-    !recipeDraftChanged.current || window.confirm('Discard unsaved recipe changes?')
+    !savingPhoto.current && (!recipeDraftChanged.current || window.confirm('Discard unsaved recipe changes?'))
 
   const handleRecipeDraftChange = (isDirty) => {
     recipeDraftChanged.current = isDirty
@@ -340,6 +386,10 @@ const App = () => {
         libraryEntries={myDishes.libraryEntries}
         storageStatus={myDishes.storageStatus}
         replacementError={myDishes.replacementError}
+        photoCleanupError={photoCleanupError}
+        onRetryPhotoCleanup={myDishes.storageStatus === 'ready'
+          ? () => cleanUpPhotos(latestDishes.current.personalRecipes)
+          : undefined}
         onSaveRecipe={handleSavePersonalRecipe}
         onDeleteRecipe={handleDeletePersonalRecipe}
         onBuiltInRecipe={handleBuiltInRecipe}

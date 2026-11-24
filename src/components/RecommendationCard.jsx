@@ -1,8 +1,11 @@
+import RecipeImage from './RecipeImage.jsx'
+
 const RecommendationCard = ({ match }) => {
   const { recipe, matchedIngredients, missingIngredients, matchedCount, trackedCount, matchPercentage } = match
 
   return (
     <article className="recommendation-card" aria-labelledby="recipe-heading">
+      <RecipeImage recipe={recipe} eager showCredit />
       <h2 id="recipe-heading">{recipe.name}</h2>
       <ul className="recipe-meta" aria-label="Recipe information">
         <li>{recipe.cookingTime} min</li>

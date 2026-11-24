@@ -19,6 +19,8 @@ Use **My Dishes** to create, search, expand, edit, and delete personal recipes. 
 
 My Dishes uses separate browser storage from Pantry. Library entries store recipe IDs and preferences. Removing a saved recipe or deleting a personal one removes its preferences. After a storage read failure, explicit session changes take precedence, including turning off a preference or removing a recipe. Untouched preferences are recovered from storage. Removing and saving the same recipe again starts its preferences fresh. If a personal recipe ID is reassigned, its session preferences follow the new ID. Duplicate entries already in storage retain enabled flags from either copy and require replacement confirmation along with other partially recovered data.
 
+Personal recipe photos are optional. Choose a JPEG, PNG, or WebP up to 10 MB. Photos stay in this browser in IndexedDB. Recipe details and library preferences stay in localStorage. Built-in photos load from Wikimedia Commons and fall back to a placeholder when unavailable. See [photo credits](IMAGE_CREDITS.md).
+
 Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty.
 
 Choose one of three cooking modes on **Home**:
@@ -31,7 +33,7 @@ Home recommendations include all built-in and personal recipes. Matches use avai
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 
-Run `node --test` to verify ingredient matching, pantry utilities, and recommendation rules.
+Run `node --test` to verify recipe and photo utilities, ingredient matching, pantry utilities, and recommendation rules.
 
 If browser storage is unavailable, you can keep editing the pantry in memory and retry loading or saving. A successful load retry keeps saved entries alongside ingredients added during the outage. If saved data is unreadable or only partly recoverable, it is kept as-is until you confirm **Replace saved pantry**. Unsaved changes can be lost on refresh.
 

@@ -20,6 +20,8 @@ const MyDishes = ({
   libraryEntries,
   storageStatus,
   replacementError,
+  photoCleanupError,
+  onRetryPhotoCleanup,
   onSaveRecipe,
   onDeleteRecipe,
   onBuiltInRecipe,
@@ -84,9 +86,9 @@ const MyDishes = ({
     setIsBrowsing(!isBrowsing)
   }
 
-  const handleSave = (values) => {
+  const handleSave = async (values, draftPhoto) => {
     const recipe = editor.recipe
-    const error = onSaveRecipe(values, recipe)
+    const error = await onSaveRecipe(values, recipe, draftPhoto)
     if (!error) {
       closeEditor(!recipe || normalizeRecipeName(values.name).includes(searchTerm))
     }
@@ -182,12 +184,20 @@ const MyDishes = ({
           )}
         </div>
       )}
+      {photoCleanupError && (
+        <div className="storage-warning dishes-warning">
+          <p role="alert">Could not clear an unused photo from browser storage.</p>
+          {onRetryPhotoCleanup && (
+            <button className="pantry-button" type="button" onClick={onRetryPhotoCleanup}>Retry photo cleanup</button>
+          )}
+        </div>
+      )}
       {editor && (
         <RecipeForm
           key={editor.key}
           recipe={editor.recipe}
           onSave={handleSave}
-          onCancel={() => closeEditor()}
+          onCancel={() => { if (canDiscardDraft()) closeEditor() }}
           onDraftChange={() => onDraftChange(true)}
         />
       )}
