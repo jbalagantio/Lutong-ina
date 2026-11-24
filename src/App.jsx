@@ -13,6 +13,7 @@ import {
 } from './utils/cookingHistory.js'
 import recipes from './data/recipes.js'
 import {
+  createPersonalRecipeId,
   deletePersonalRecipe,
   hasDuplicateRecipeNames,
   loadMyDishes,
@@ -64,7 +65,10 @@ const App = ({ canReconcilePhotos }) => {
   const [pantry, setPantry] = useState(loadPantry)
   const [groceryList, setGroceryList] = useState(loadGroceryList)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
-  const [cookingHistory, setCookingHistory] = useState(loadCookingHistory)
+  const [cookingHistory, setCookingHistory] = useState(() => {
+    const history = loadCookingHistory()
+    return { ...history, persistedRecordIds: new Set(history.records.map((record) => record.id)) }
+  })
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const mainContent = useRef(null)
   const hasNavigated = useRef(false)
@@ -72,6 +76,7 @@ const App = ({ canReconcilePhotos }) => {
   const latestGroceryList = useRef(groceryList)
   const groceryDraftChanged = useRef(false)
   const latestDishes = useRef(myDishes)
+  const savedPersonalIds = useRef(new Set(myDishes.personalRecipes.map((recipe) => recipe.id)))
   const latestHistory = useRef(cookingHistory)
   const pendingLibraryChanges = useRef(new Map())
   const recipeDraftChanged = useRef(false)
@@ -109,6 +114,9 @@ const App = ({ canReconcilePhotos }) => {
         storageStatus,
         replacementError: storageStatus === 'ready' ? undefined : nextHistory.replacementError,
         hasUnsavedChanges: storageStatus !== 'ready',
+        persistedRecordIds: storageStatus === 'ready'
+          ? new Set(records.map((record) => record.id))
+          : nextHistory.persistedRecordIds,
       })
     }
     return storageStatus
@@ -123,7 +131,7 @@ const App = ({ canReconcilePhotos }) => {
     if (!record) return null
 
     const records = [...current.records, record]
-    if (personalRecipe && dishes.storageStatus === 'read-failed') {
+    if (personalRecipe && !savedPersonalIds.current.has(personalRecipe.id)) {
       const pendingRecordIds = new Set(current.pendingRecordIds)
       pendingRecordIds.add(record.id)
       commitHistory({ ...current, records, pendingRecordIds })
@@ -152,7 +160,8 @@ const App = ({ canReconcilePhotos }) => {
   const handleRetryHistory = () => {
     const current = latestHistory.current
     if (current.storageStatus !== 'read-failed') return saveAndCommitHistory(current)
-    const recovered = loadCookingHistory()
+    const loaded = loadCookingHistory()
+    const recovered = { ...loaded, persistedRecordIds: new Set(loaded.records.map((record) => record.id)) }
     if (recovered.storageStatus === 'read-failed') return 'read-failed'
     if (current.records.length === 0) {
       commitHistory(recovered)
@@ -172,11 +181,15 @@ const App = ({ canReconcilePhotos }) => {
     return saveAndCommitHistory(current, true) === 'ready'
   }
 
-  const settleSessionCookingRecords = (remappedRecipes) => {
+  const settleSessionCookingRecords = (storageStatus, remappedRecipes = new Map()) => {
     const current = latestHistory.current
     if (!current.pendingRecordIds?.size) return
     const records = remapSessionCookingRecipes(current.records, current.pendingRecordIds, remappedRecipes)
-    saveAndCommitHistory({ ...current, records, pendingRecordIds: undefined })
+    if (storageStatus === 'ready') {
+      saveAndCommitHistory({ ...current, records, pendingRecordIds: undefined })
+    } else if (records !== current.records) {
+      commitHistory({ ...current, records })
+    }
   }
 
   const commitPantry = (nextPantry) => {
@@ -412,6 +425,10 @@ const App = ({ canReconcilePhotos }) => {
     const storageStatus = saveMyDishes(nextDishes)
     const replacementError = storageStatus === 'ready' ? undefined : nextDishes.replacementError
     commitMyDishes({ ...nextDishes, storageStatus, replacementError }, remappedRecipes)
+    if (storageStatus === 'ready') {
+      savedPersonalIds.current = new Set(nextDishes.personalRecipes.map((recipe) => recipe.id))
+    }
+    settleSessionCookingRecords(storageStatus, remappedRecipes)
     if (storageStatus === 'ready') void cleanUpPhotos()
     return storageStatus
   }
@@ -515,13 +532,7 @@ const App = ({ canReconcilePhotos }) => {
       return
     }
     const changes = pendingLibraryChanges.current
-    if (current.personalRecipes.length === 0 && changes.size === 0) {
-      commitMyDishes(recovered)
-      settleSessionCookingRecords(new Map())
-      void cleanUpPhotos()
-      return { status: recovered.storageStatus, remappedRecipes: new Map() }
-    }
-
+    savedPersonalIds.current = new Set(recovered.personalRecipes.map((recipe) => recipe.id))
     const personalRecipes = mergeRecoveredPersonalRecipes(recovered.personalRecipes, current.personalRecipes)
     const remappedRecipes = new Map()
     // Recovery appends session recipes in their original order after the saved recipes.
@@ -531,9 +542,31 @@ const App = ({ canReconcilePhotos }) => {
         remappedRecipes.set(recipe.id, mergedRecipe)
       }
     })
+    // Deleted session recipes can still own pending history, even though there is no recipe to merge.
+    const { records, pendingRecordIds } = latestHistory.current
+    if (pendingRecordIds?.size) {
+      const deletedRecipeRemaps = new Map()
+      const reservedIds = new Set([...personalRecipes.map((recipe) => recipe.id), ...records.map((record) => record.recipeId)])
+      for (const record of records) {
+        if (!pendingRecordIds.has(record.id) || !savedPersonalIds.current.has(record.recipeId) ||
+          remappedRecipes.has(record.recipeId) || deletedRecipeRemaps.has(record.recipeId)) continue
+        const id = createPersonalRecipeId(reservedIds)
+        reservedIds.add(id)
+        deletedRecipeRemaps.set(record.recipeId, { id })
+      }
+      if (deletedRecipeRemaps.size > 0) {
+        const remapped = remapSessionCookingRecipes(records, pendingRecordIds, deletedRecipeRemaps)
+        commitHistory({ ...latestHistory.current, records: remapped })
+      }
+    }
+    if (current.personalRecipes.length === 0 && changes.size === 0) {
+      commitMyDishes(recovered)
+      settleSessionCookingRecords(recovered.storageStatus, remappedRecipes)
+      void cleanUpPhotos()
+      return { status: recovered.storageStatus, remappedRecipes: new Map() }
+    }
     const libraryEntries = recoverLibraryEntries(recovered.libraryEntries, changes, remappedRecipes)
     const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries }, remappedRecipes)
-    settleSessionCookingRecords(remappedRecipes)
     pendingLibraryChanges.current = new Map()
     return { status, remappedRecipes }
   }
@@ -552,6 +585,8 @@ const App = ({ canReconcilePhotos }) => {
     const storageStatus = saveMyDishes({ ...current, storageStatus: 'ready' })
     if (storageStatus === 'ready') {
       commitMyDishes({ ...current, storageStatus, replacementError: undefined })
+      savedPersonalIds.current = new Set(current.personalRecipes.map((recipe) => recipe.id))
+      settleSessionCookingRecords(storageStatus)
       void cleanUpPhotos()
     } else {
       commitMyDishes({ ...current, replacementError: storageStatus })

@@ -15,7 +15,7 @@ const RecipeCookingAction = ({ recipe, history, onRecord, onView }) => {
   if (currentRecord) {
     message = 'Recorded in Cooking History.'
     if (pendingRecipe) message = 'Recorded in memory. Recover My Dishes to save this meal.'
-    else if (warning) message = 'Recorded in memory.'
+    else if (!history.persistedRecordIds.has(currentRecord.id)) message = 'Recorded in memory.'
   }
 
   const recordCooking = (event) => {

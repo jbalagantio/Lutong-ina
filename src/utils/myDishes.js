@@ -222,7 +222,7 @@ export const validatePersonalRecipe = (values) => {
   return { recipe: { name, description, cuisine, cookingTime, difficulty, servings, ingredients, instructions } }
 }
 
-const createPersonalRecipeId = (reservedIds) => {
+export const createPersonalRecipeId = (reservedIds) => {
   let id
   do {
     id = crypto.randomUUID()

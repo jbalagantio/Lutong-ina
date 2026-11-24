@@ -1103,6 +1103,14 @@ h1 {
   padding-inline-start: 0.25rem;
 }
 
+.personal-recipe-details ol {
+  max-width: 65ch;
+}
+
+.personal-recipe-details ol li + li {
+  margin-top: 0.45rem;
+}
+
 .recipe-detail-instructions li::marker {
   color: var(--orange);
   font-weight: 650;

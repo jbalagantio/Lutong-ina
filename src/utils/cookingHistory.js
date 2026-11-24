@@ -11,7 +11,7 @@ export const cookingHistoryWarnings = {
 }
 
 export const historyUnsavedWarning = 'Unsaved history changes may be lost on refresh.'
-export const pendingRecipeHistoryWarning = 'Recover My Dishes to save cooking records for new personal recipes.'
+export const pendingRecipeHistoryWarning = 'Save My Dishes to persist cooking records for new personal recipes.'
 
 const isNonblank = (value) => typeof value === 'string' && value.trim().length > 0
 

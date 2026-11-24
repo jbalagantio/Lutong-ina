@@ -39,7 +39,9 @@ Use **Mark as cooked** on a Home recommendation, in Discover recipe details, or 
 
 Open **My Dishes → Cooking History** to search name snapshots and remove individual events. Meals appear newest first, grouped by your device's local date. Name changes and recipe deletions leave past entries intact. Cooking History and Recipe Library preserve open recipe drafts when switching views.
 
-History stays in this browser under `lutong-ina-cooking-history`. A failed read can be retried, merging readable saved records with current-session events. Invalid or partial storage requires confirmed replacement. Unsaved events may be lost on refresh. Records for personal recipes created during a My Dishes read failure stay in memory until that read recovers and the recipe ID is resolved.
+History stays in this browser under `lutong-ina-cooking-history`. A failed read can be retried, merging readable saved records with current-session events. Invalid or partial storage requires confirmed replacement. Unsaved events may be lost on refresh. Cooking records for new personal recipes stay in memory until My Dishes saves their resolved IDs successfully. A later history write failure appears as a general warning and does not change the confirmation for a previously saved event.
+
+The 15 built-in recipes include preparation, cooking order, approximate timings, and doneness cues. Tortang Talong allows 45 minutes for broiling, peeling, and frying in batches. Ingredient lists and personal recipes are preserved.
 
 Choose one of three cooking modes on **Home**:
 
