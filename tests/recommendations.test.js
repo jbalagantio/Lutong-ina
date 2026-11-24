@@ -21,6 +21,48 @@ const compare = (ingredientNames, pantry) => {
   return compareRecipeIngredients(recipe, getAvailableIngredientNames(pantry))
 }
 
+test('new aliases match both ways and deduplicate conflicting pantry and recipe entries', () => {
+  const pantry = [
+    { name: 'Chicken', isAvailable: false },
+    { name: 'Manok', isAvailable: true },
+    { name: 'Tubig', isAvailable: true },
+  ]
+  const ingredients = ['Chicken', 'Manok', 'Water', 'Tubig']
+  const match = compare(ingredients, pantry)
+  assert.deepEqual([...getAvailableIngredientNames(pantry)], ['chicken', 'water'])
+  assert.equal(match.matchedCount, 1)
+  assert.equal(match.trackedCount, 1)
+  assert.equal(match.matchPercentage, 100)
+
+  const reverseMatch = compare(['Manok', 'Tubig'], available('Chicken'))
+  assert.equal(reverseMatch.matchedCount, 1)
+  assert.deepEqual(reverseMatch.missingIngredients, [])
+
+  const outOfStock = pantry.map((item) => ({ ...item, isAvailable: false }))
+  const missing = compare(ingredients, outOfStock)
+  assert.equal(missing.matchedCount, 0)
+  assert.deepEqual(missing.missingIngredients.map((item) => item.name), ['Chicken'])
+})
+
+test('generic, differently prepared, and materially different ingredients remain distinct', () => {
+  const distinctPairs = [
+    ['Pork', 'Pork belly'], ['Liempo', 'Kasim'], ['Kasim', 'Pork ribs'],
+    ['Beef', 'Beef sirloin'], ['Onion', 'Yellow onion'], ['Sibuyas', 'Red onion'],
+    ['Red onion', 'Yellow onion'], ['White onion', 'Yellow onion'],
+    ['Garlic powder', 'Garlic'], ['Tomato', 'Tomato sauce'], ['Vinegar', 'Cane vinegar'],
+    ['Calamansi', 'Calamansi juice'], ['Tamarind paste', 'Tamarind pulp'],
+    ['Tamarind concentrate', 'Tamarind pulp'], ['Black peppercorns', 'Ground black pepper'],
+    ['Uncooked rice', 'Cooked rice'], ['Rice', 'Cooked rice'],
+    ['Coconut cream', 'Coconut milk'], ['Evaporated milk', 'Coconut milk'],
+    ['Beans', 'Long beans'], ['Beans', 'Mung beans'], ['Long beans', 'Mung beans'],
+    ['Pechay Baguio', 'Pechay'],
+  ]
+  for (const [pantryName, recipeName] of distinctPairs) {
+    assert.equal(compare([recipeName], available(pantryName)).matchedCount, 0, pantryName)
+    assert.equal(compare([pantryName], available(recipeName)).matchedCount, 0, recipeName)
+  }
+})
+
 test('matches exact names, case, surrounding and repeated internal whitespace', () => {
   const match = compare(['Garlic', 'Fish sauce', 'Tomato', 'Soy sauce'], available(
     'Garlic', 'FISH SAUCE', '  Tomato  ', 'Soy \t  sauce',

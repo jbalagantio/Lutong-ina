@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { normalizeIngredientName, pantryCategories } from '../utils/pantry.js'
+import { matchesIngredientSearch, normalizeIngredientName, pantryCategories } from '../utils/pantry.js'
 import PantryForm from './PantryForm.jsx'
 
 const Pantry = ({
@@ -19,7 +19,7 @@ const Pantry = ({
   const outOfStockCount = ingredients.length - availableCount
   const searchTerm = normalizeIngredientName(search)
   const visibleIngredients = ingredients.filter((ingredient) => {
-    const nameMatches = normalizeIngredientName(ingredient.name).includes(searchTerm)
+    const nameMatches = matchesIngredientSearch(ingredient.name, searchTerm)
     const categoryMatches = !categoryFilter || ingredient.category === categoryFilter
     const availability = ingredient.isAvailable ? 'available' : 'out-of-stock'
     const availabilityMatches = !availabilityFilter || availability === availabilityFilter

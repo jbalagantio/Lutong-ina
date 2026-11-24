@@ -25,6 +25,8 @@ Choose one of three cooking modes on **Home**:
 
 Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Suggestion rounds reset when changing modes or leaving Home. Pantry data stays in this browser, and the app shows a warning if storage fails. Recipe browsing, recipe details, and My Dishes management are planned for later phases.
 
-Run `node --test tests/recommendations.test.js` to verify the recommendation rules.
+Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
+
+Run `node --test` to verify ingredient matching, pantry utilities, and recommendation rules.
 
 Codex assisted with the React components, CSS, sample recipe data, pantry behavior, recommendation rules, and verification.
