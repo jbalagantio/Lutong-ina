@@ -10,7 +10,7 @@ const { cuisines, difficulties } = getDiscoverFilterOptions(recipes)
 const cookingTimeLimits = [30, 60, 90]
 const defaultFilters = { query: '', cuisine: '', maxTime: '', difficulty: '' }
 
-const Discover = ({ pantryIngredients, libraryEntries, libraryStorageStatus, onBuiltInRecipe, onRecipePreference, onOpenMyDishes }) => {
+const Discover = ({ pantryIngredients, libraryEntries, libraryStorageStatus, onBuiltInRecipe, onRecipePreference, onOpenMyDishes, renderGroceryAction }) => {
   const [filters, setFilters] = useState(defaultFilters)
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const searchInput = useRef(null)
@@ -77,6 +77,7 @@ const Discover = ({ pantryIngredients, libraryEntries, libraryStorageStatus, onB
         <RecipeDetails
           recipe={selectedRecipe}
           match={matches[0]}
+          groceryAction={renderGroceryAction(matches[0])}
           headingRef={detailHeading}
           libraryEntry={libraryByRecipeId.get(selectedRecipeId)}
           onToggleSaved={() => onBuiltInRecipe(selectedRecipeId, !libraryByRecipeId.has(selectedRecipeId))}

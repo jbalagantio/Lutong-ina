@@ -3,7 +3,7 @@ import IngredientCoverage from './IngredientCoverage.jsx'
 import RecipeImage from './RecipeImage.jsx'
 import RecipePreferences from './RecipePreferences.jsx'
 
-const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved, onTogglePreference }) => {
+const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved, onTogglePreference, groceryAction }) => {
   const ingredientStatuses = getRecipeIngredientStatuses(match)
 
   return (
@@ -46,6 +46,7 @@ const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved,
               </li>
             ))}
           </ul>
+          {groceryAction}
         </section>
         <section aria-labelledby="recipe-detail-instructions">
           <h2 id="recipe-detail-instructions">Instructions</h2>

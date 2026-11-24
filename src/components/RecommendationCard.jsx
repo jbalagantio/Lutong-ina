@@ -1,6 +1,6 @@
 import RecipeImage from './RecipeImage.jsx'
 
-const RecommendationCard = ({ match }) => {
+const RecommendationCard = ({ match, groceryAction }) => {
   const { recipe, matchedIngredients, missingIngredients, matchedCount, trackedCount, matchPercentage } = match
 
   return (
@@ -39,6 +39,7 @@ const RecommendationCard = ({ match }) => {
           )}
         </div>
       </div>
+      {groceryAction}
     </article>
   )
 }

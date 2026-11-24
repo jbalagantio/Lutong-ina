@@ -5,6 +5,7 @@ import Home from './components/Home.jsx'
 import MyDishes from './components/MyDishes.jsx'
 import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
+import RecipeGroceryAction from './components/RecipeGroceryAction.jsx'
 import recipes from './data/recipes.js'
 import {
   deletePersonalRecipe,
@@ -20,7 +21,7 @@ import {
   toggleRecipePreference,
 } from './utils/myDishes.js'
 import { reconcileRecipePhotos, saveRecipePhoto } from './utils/recipePhotos.js'
-import { loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem, saveGroceryList } from './utils/groceryList.js'
+import { addMissingGroceryItems, loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem, saveGroceryList } from './utils/groceryList.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -50,6 +51,7 @@ const getDishesMatches = (ingredients, dishes) => {
 
 const App = ({ canReconcilePhotos }) => {
   const [activeScreen, setActiveScreen] = useState('home')
+  const [initialPantryView, setInitialPantryView] = useState('ingredients')
   const [pantry, setPantry] = useState(loadPantry)
   const [groceryList, setGroceryList] = useState(loadGroceryList)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
@@ -70,8 +72,9 @@ const App = ({ canReconcilePhotos }) => {
   useLayoutEffect(() => {
     if (!hasNavigated.current) return
     hasNavigated.current = false
-    mainContent.current?.querySelector('h1')?.focus()
-  }, [activeScreen])
+    const heading = activeScreen === 'pantry' && initialPantryView === 'grocery' ? '#grocery-heading' : 'h1'
+    mainContent.current?.querySelector(heading)?.focus()
+  }, [activeScreen, initialPantryView])
 
   const commitPantry = (nextPantry) => {
     // Consecutive actions can run before React renders the previous update.
@@ -172,6 +175,22 @@ const App = ({ canReconcilePhotos }) => {
     if (result.error) return result
     saveAndCommitGroceryList({ ...current, items: result.items, hasUnsavedChanges: true })
     return result
+  }
+
+  const handleAddRecipeGroceries = (recipeId) => {
+    const catalog = getRecommendationCatalog(recipes, latestDishes.current.personalRecipes)
+    const recipe = catalog.find((entry) => entry.id === recipeId)
+    if (!recipe) return { error: 'This recipe is no longer available.' }
+
+    const pantryIngredients = latestPantry.current.ingredients
+    const [match] = getRecipeMatches([recipe], pantryIngredients)
+    const current = latestGroceryList.current
+    const { items, added, alreadyListed, skipped } = addMissingGroceryItems(current.items, match.missingIngredients, pantryIngredients)
+    let storageStatus = current.storageStatus
+    if (added.length > 0) {
+      storageStatus = saveAndCommitGroceryList({ ...current, items, hasUnsavedChanges: true })
+    }
+    return { added: added.length, listed: alreadyListed.length, skipped: skipped.length, storageStatus }
   }
 
   const handleRemoveGroceryItem = (id) => {
@@ -428,7 +447,7 @@ const App = ({ canReconcilePhotos }) => {
     recipeDraftChanged.current = isDirty
   }
 
-  const handleNavigate = (screen, trigger) => {
+  const handleNavigate = (screen, trigger, pantryView = 'ingredients') => {
     if (activeScreen === 'pantry' && screen !== activeScreen) {
       if (groceryDraftChanged.current && !window.confirm('Discard unsaved grocery item changes?')) {
         trigger?.focus()
@@ -451,7 +470,10 @@ const App = ({ canReconcilePhotos }) => {
         refreshRecommendationRound(session, session.mode, matches, randomValue, dishes.libraryEntries)
       ))
     }
-    if (screen !== activeScreen) hasNavigated.current = true
+    if (screen !== activeScreen) {
+      hasNavigated.current = true
+      if (screen === 'pantry') setInitialPantryView(pantryView)
+    }
     setActiveScreen(screen)
     if (screen === 'my-dishes') void cleanUpPhotos()
   }
@@ -470,10 +492,18 @@ const App = ({ canReconcilePhotos }) => {
     setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart, dishes.libraryEntries))
   }
 
+  const renderGroceryAction = (match) => (
+    <RecipeGroceryAction key={match.recipe.id} match={match} groceryList={groceryList}
+      onAdd={handleAddRecipeGroceries}
+      onView={(event) => handleNavigate('pantry', event.currentTarget, 'grocery')} />
+  )
+
   let screen
   if (activeScreen === 'my-dishes') {
     screen = (
       <MyDishes
+        pantryIngredients={pantry.ingredients}
+        renderGroceryAction={renderGroceryAction}
         canDiscardDraft={canDiscardRecipeDraft}
         onDraftChange={handleRecipeDraftChange}
         personalRecipes={myDishes.personalRecipes}
@@ -496,6 +526,7 @@ const App = ({ canReconcilePhotos }) => {
   } else if (activeScreen === 'pantry') {
     screen = (
       <Pantry
+        initialView={initialPantryView}
         ingredients={pantry.ingredients}
         onAddIngredient={handleAddIngredient}
         onEditIngredient={handleEditIngredient}
@@ -512,6 +543,7 @@ const App = ({ canReconcilePhotos }) => {
   } else if (activeScreen === 'discover') {
     screen = (
       <Discover
+        renderGroceryAction={renderGroceryAction}
         pantryIngredients={pantry.ingredients}
         libraryEntries={myDishes.libraryEntries}
         libraryStorageStatus={myDishes.storageStatus}
@@ -528,6 +560,7 @@ const App = ({ canReconcilePhotos }) => {
       : { matches: getEligibleRecommendations(mode, matches), isFallback: false }
     screen = (
       <Home
+        renderGroceryAction={renderGroceryAction}
         ingredients={pantry.ingredients}
         mode={mode}
         round={rounds[mode]}

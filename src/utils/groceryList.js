@@ -1,6 +1,42 @@
-import { matchesIngredientSearch, normalizeIngredientName, pantryCategories, pantryNameLimit, wouldDuplicateIngredient } from './pantry.js'
+import { getIngredientMatchName, matchesIngredientSearch, normalizeIngredientName, pantryCategories, pantryNameLimit, wouldDuplicateIngredient } from './pantry.js'
 
 const storageKey = 'lutong-ina-grocery-list'
+
+export const groceryStorageWarnings = {
+  'read-failed': 'Could not open the saved grocery list.',
+  invalid: 'The saved grocery list is unreadable.',
+  partial: 'Some saved grocery items could not be recovered.',
+  'write-failed': 'Could not save the grocery list.',
+  'quota-exceeded': 'Browser storage is full. Grocery items could not be saved.',
+}
+
+export const groceryUnsavedWarning = 'Changes are only in memory and may be lost on refresh.'
+
+const ingredientsByCategory = {
+  Meat: ['beef sirloin', 'chicken', 'pork belly', 'pork liver', 'pork ribs', 'pork shoulder'],
+  Vegetables: [
+    'bitter melon', 'cabbage', 'carrot', 'eggplant', 'garlic', 'ginger', 'long beans', 'moringa leaves',
+    'pechay', 'potato', 'radish', 'red bell pepper', 'red onion', 'squash', 'tomato', 'water spinach', 'yellow onion',
+  ],
+  Fruits: ['green papaya'],
+  'Grains and Staples': ['coconut milk', 'cooked rice', 'cooking oil', 'elbow macaroni', 'mung beans'],
+  'Dairy and Eggs': ['egg', 'evaporated milk'],
+  Seasonings: [
+    'bay leaf', 'black peppercorns', 'calamansi juice', 'cane vinegar', 'fish sauce', 'ground black pepper',
+    'salt', 'soy sauce', 'tamarind pulp', 'tomato sauce',
+  ],
+}
+
+export const resolveGroceryCategory = (name, pantry) => {
+  const matchName = getIngredientMatchName(name)
+  // Pantry order breaks ties, including when a matching ingredient is out of stock.
+  const match = pantry.find((ingredient) => (
+    pantryCategories.includes(ingredient.category) && getIngredientMatchName(ingredient.name) === matchName
+  ))
+  if (match) return match.category
+
+  return pantryCategories.find((category) => ingredientsByCategory[category]?.includes(matchName)) ?? 'Others'
+}
 
 const makeUniqueId = (usedIds) => {
   let id = crypto.randomUUID()
@@ -8,15 +44,19 @@ const makeUniqueId = (usedIds) => {
   return id
 }
 
+const getNameError = (name) => {
+  if (!name) return 'Enter an item name.'
+  if (name.length > pantryNameLimit) return `Use ${pantryNameLimit} characters or fewer for the item name.`
+  return null
+}
+
 export const prepareGroceryItem = (items, values, id = null) => {
   const current = items.find((item) => item.id === id)
   if (id !== null && !current) return { error: 'This grocery item is no longer available.' }
 
   const name = typeof values.name === 'string' ? values.name.trim() : ''
-  if (!name) return { field: 'name', error: 'Enter an item name.' }
-  if (name.length > pantryNameLimit) {
-    return { field: 'name', error: `Use ${pantryNameLimit} characters or fewer for the item name.` }
-  }
+  const nameError = getNameError(name)
+  if (nameError) return { field: 'name', error: nameError }
   if (!pantryCategories.includes(values.category)) return { field: 'category', error: 'Select a valid category.' }
   if (wouldDuplicateIngredient(name, items, current)) {
     return { field: 'name', error: 'That item is already on your grocery list.' }
@@ -32,6 +72,48 @@ export const prepareGroceryItem = (items, values, id = null) => {
     ? items.map((entry) => entry === current ? item : entry)
     : [...items, item]
   return { item, items: nextItems }
+}
+
+export const planGroceryAddition = (items, missingIngredients) => {
+  const listedNames = new Set(items.map((item) => getIngredientMatchName(item.name)))
+  const seenNames = new Set()
+  const names = []
+  const alreadyListed = []
+  const skipped = []
+  for (const ingredient of missingIngredients) {
+    const name = typeof ingredient?.name === 'string' ? ingredient.name.trim() : ''
+    if (getNameError(name)) {
+      skipped.push(ingredient)
+      continue
+    }
+
+    const matchName = getIngredientMatchName(name)
+    if (matchName === 'water' || seenNames.has(matchName)) {
+      skipped.push(ingredient)
+      continue
+    }
+    seenNames.add(matchName)
+    if (listedNames.has(matchName)) alreadyListed.push(name)
+    else names.push(name)
+  }
+  return { names, alreadyListed, skipped }
+}
+
+export const addMissingGroceryItems = (items, missingIngredients, pantry) => {
+  const { names, alreadyListed, skipped } = planGroceryAddition(items, missingIngredients)
+  const added = []
+  let nextItems = items
+  for (const name of names) {
+    const category = resolveGroceryCategory(name, pantry)
+    const result = prepareGroceryItem(nextItems, { name, category })
+    if (result.error) {
+      skipped.push({ name })
+      continue
+    }
+    nextItems = result.items
+    added.push(result.item)
+  }
+  return { items: nextItems, added, alreadyListed, skipped }
 }
 
 export const removeGroceryItem = (items, id) => {

@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react'
 import { filterRecipeCollection, getRecipeCollection, hasDuplicateRecipeNames, myDishesStorageWarnings, normalizeRecipeName } from '../utils/myDishes.js'
+import { getRecipeMatches } from '../utils/recommendations.js'
 import LibraryRecipeRow from './LibraryRecipeRow.jsx'
 import RecipeForm from './RecipeForm.jsx'
 import RecipePreferences from './RecipePreferences.jsx'
 
 const MyDishes = ({
+  pantryIngredients,
+  renderGroceryAction,
   canDiscardDraft,
   onDraftChange,
   personalRecipes,
@@ -32,6 +35,14 @@ const MyDishes = ({
   const searchTerm = normalizeRecipeName(search)
   const collection = getRecipeCollection(personalRecipes, libraryEntries)
   const visibleRecipes = filterRecipeCollection(collection, filter, searchTerm)
+  const expandedRecipe = visibleRecipes.find((item) => item.recipe.id === expandedId)?.recipe
+  const expandedMatch = expandedRecipe && getRecipeMatches([expandedRecipe], pantryIngredients)[0]
+  let expandedGroceryAction = null
+  if (expandedMatch) {
+    expandedGroceryAction = expandedMatch.trackedCount > 0
+      ? renderGroceryAction(expandedMatch)
+      : <p>No tracked ingredients.</p>
+  }
   const warning = storageStatus === 'duplicate-names' ? '' : myDishesStorageWarnings[storageStatus]
   const hasNameConflict = hasDuplicateRecipeNames(personalRecipes)
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
@@ -196,6 +207,7 @@ const MyDishes = ({
         <ul className="dishes-list" aria-label="My Dishes recipes">
           {visibleRecipes.map((item) => (
             <LibraryRecipeRow key={item.recipe.id} recipe={item.recipe} isExpanded={expandedId === item.recipe.id}
+              groceryAction={expandedId === item.recipe.id ? expandedGroceryAction : null}
               onToggleDetails={() => setExpandedId(expandedId === item.recipe.id ? null : item.recipe.id)}>
               <RecipePreferences recipeName={item.recipe.name} isFavorite={item.isFavorite} isFamiliar={item.isFamiliar}
                 onTogglePreference={(preference) => handlePreference(item, preference)} />

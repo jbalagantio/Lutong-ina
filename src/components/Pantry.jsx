@@ -4,6 +4,7 @@ import GroceryList from './GroceryList.jsx'
 import PantryForm from './PantryForm.jsx'
 
 const Pantry = ({
+  initialView,
   ingredients,
   onAddIngredient,
   onEditIngredient,
@@ -16,7 +17,7 @@ const Pantry = ({
   onRemoveGroceryItem,
   onGroceryDraftChange,
 }) => {
-  const [activeView, setActiveView] = useState('ingredients')
+  const [activeView, setActiveView] = useState(initialView)
   const showIngredients = activeView === 'ingredients'
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState(null)

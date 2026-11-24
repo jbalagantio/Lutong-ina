@@ -333,6 +333,19 @@ h1 {
   font-size: clamp(1.4rem, 2.5vw, 1.75rem);
 }
 
+.recipe-grocery {
+  margin-block: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.recipe-grocery-feedback:empty {
+  margin: 0;
+}
+
+.recipe-grocery-feedback:not(:empty) + .pantry-actions {
+  margin-top: 0.45rem;
+}
+
 .pantry-fields.grocery-filters {
   margin-top: 1rem;
   grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);

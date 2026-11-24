@@ -1,15 +1,7 @@
 import { useRef, useState } from 'react'
-import { filterGroceryItems } from '../utils/groceryList.js'
+import { filterGroceryItems, groceryStorageWarnings, groceryUnsavedWarning } from '../utils/groceryList.js'
 import { pantryCategories } from '../utils/pantry.js'
 import GroceryItemForm from './GroceryItemForm.jsx'
-
-const storageWarnings = {
-  'read-failed': 'Could not open the saved grocery list.',
-  invalid: 'The saved grocery list is unreadable.',
-  partial: 'Some saved grocery items could not be recovered.',
-  'write-failed': 'Could not save the grocery list.',
-  'quota-exceeded': 'Browser storage is full. Grocery items could not be saved.',
-}
 
 const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraftChange }) => {
   const heading = useRef(null)
@@ -30,7 +22,7 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
     { title: 'Purchased', items: visibleItems.filter((item) => item.isPurchased) },
   ]
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
-  const warning = storageWarnings[storageStatus]
+  const warning = groceryStorageWarnings[storageStatus]
 
   const retry = () => {
     const { storageStatus: status, remappedIds } = onRetry()
@@ -115,9 +107,9 @@ const GroceryList = ({ groceryList, onRetry, onReplace, onSave, onRemove, onDraf
       {warning && (
         <div className="storage-warning grocery-warning">
           <p role="alert">
-            {warning} {storageWarnings[replacementError]}
+            {warning} {groceryStorageWarnings[replacementError]}
             {needsReplacement && ' Saved data stays protected until you confirm replacement.'}
-            {hasUnsavedChanges && ' Changes are only in memory and may be lost on refresh.'}
+            {hasUnsavedChanges && ` ${groceryUnsavedWarning}`}
           </p>
           {needsReplacement ? (
             <button className="pantry-button" type="button" onClick={replace}>Replace saved grocery list</button>

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  filterGroceryItems, loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem, saveGroceryList,
+  addMissingGroceryItems, filterGroceryItems, loadGroceryList, planGroceryAddition, prepareGroceryItem,
+  recoverGroceryItems, removeGroceryItem, resolveGroceryCategory, saveGroceryList,
 } from '../src/utils/groceryList.js'
 import { pantryCategories, pantryNameLimit } from '../src/utils/pantry.js'
+import { getRecipeMatches } from '../src/utils/recommendations.js'
+import recipes from '../src/data/recipes.js'
 
 const key = 'lutong-ina-grocery-list'
 const garlic = { id: 'garlic', name: '  Garlic  ', category: pantryCategories[0], isPurchased: false }
@@ -181,6 +184,90 @@ test('repeated read failures retain session data and invalid or partial recovery
     const { items } = recoverGroceryItems(recovered.items, session)
     assert.deepEqual(items, [...recovered.items, ...session])
     assert.equal(saveGroceryList({ items, storageStatus: recovered.storageStatus }), expected)
+    assert.equal(values.get(key), raw)
+  }
+  assert.equal(storage.setItem.mock.callCount(), 0)
+  assert.equal(values.get('unrelated'), 'keep')
+})
+
+const ingredient = (name) => ({ name })
+
+test('recipe matching supplies unique missing ingredients, with out-of-stock items and unknown personal names', () => {
+  const recipe = {
+    ingredients: ['Manok', 'Chicken', 'Bawang', 'Garlic', 'Tubig', 'Water', 'Lemon jam', 'Talong'].map(ingredient),
+  }
+  const pantry = [
+    { name: 'Chicken', category: 'Meat', isAvailable: true },
+    { name: 'Garlic', category: 'Seasonings', isAvailable: false },
+  ]
+  const originalRecipe = structuredClone(recipe)
+  const originalPantry = structuredClone(pantry)
+  const [match] = getRecipeMatches([recipe], pantry)
+  const result = addMissingGroceryItems([], match.missingIngredients, pantry)
+  assert.deepEqual(result.added.map(({ name, category, isPurchased }) => [name, category, isPurchased]), [
+    ['Bawang', 'Seasonings', false], ['Lemon jam', 'Others', false], ['Talong', 'Vegetables', false],
+  ])
+  assert.equal(new Set(result.added.map((item) => item.id)).size, 3)
+  assert.deepEqual(recipe, originalRecipe)
+  assert.deepEqual(pantry, originalPantry)
+  const [waterOnly] = getRecipeMatches([{ ingredients: ['Water', 'Tubig'].map(ingredient) }], pantry)
+  assert.equal(waterOnly.trackedCount, 0)
+  assert.equal(addMissingGroceryItems(result.items, waterOnly.missingIngredients, pantry).items, result.items)
+})
+
+test('bulk planning skips purchased, unpurchased, repeated, invalid and untracked entries without editing legacy rows', () => {
+  const chicken = { ...garlic, id: 'chicken', name: 'Chicken' }
+  const items = [garlic, bawang, chicken]
+  const missing = [
+    ...['Garlic', 'Bawang', 'Manok', 'Toyo', 'Soy sauce', 'Tubig', ' ', 'x'.repeat(pantryNameLimit + 1)].map(ingredient),
+    null, { name: 4 },
+  ]
+  const original = structuredClone(missing)
+  const preview = planGroceryAddition(items, missing)
+  assert.deepEqual(preview.names, ['Toyo'])
+  assert.deepEqual(preview.alreadyListed, ['Garlic', 'Manok'])
+  assert.equal(preview.skipped.length, 7)
+  const result = addMissingGroceryItems(items, missing, [])
+  assert.deepEqual(result.added.map((item) => item.name), preview.names)
+  assert.deepEqual(result.items, [...items, ...result.added])
+  assert.deepEqual(items, [garlic, bawang, chicken])
+  assert.deepEqual(missing, original)
+  const repeated = addMissingGroceryItems(result.items, missing, [])
+  assert.deepEqual(repeated.added, [])
+  assert.equal(repeated.items, result.items)
+  assert.deepEqual(repeated.alreadyListed, ['Garlic', 'Manok', 'Toyo'])
+})
+
+test('category resolution uses the first valid pantry match, falls back to catalog categories and covers all tracked built-ins', () => {
+  const pantry = [
+    { name: 'Garlic', category: 'Invalid' },
+    { name: 'Bawang', category: 'Seasonings', isAvailable: false },
+    { name: 'Garlic', category: 'Vegetables', isAvailable: true },
+  ]
+  assert.equal(resolveGroceryCategory('Garlic', pantry), 'Seasonings')
+  assert.equal(resolveGroceryCategory('Itlog', []), 'Dairy and Eggs')
+  assert.equal(resolveGroceryCategory('Ginger jelly', []), 'Others')
+  for (const { missingIngredients } of getRecipeMatches(recipes, [])) {
+    for (const { name } of missingIngredients) {
+      const category = resolveGroceryCategory(name, [])
+      assert.ok(pantryCategories.includes(category) && category !== 'Others', name)
+    }
+  }
+})
+
+test('bulk additions survive a blocked read and preserve protected storage and unrelated data', (context) => {
+  const { storage, values } = installStorage(context, null)
+  context.mock.method(storage, 'getItem', () => { throw new Error('Blocked') })
+  const blocked = loadGroceryList()
+  const bulk = addMissingGroceryItems(blocked.items, ['Toyo', 'Egg'].map(ingredient), [])
+  assert.equal(saveGroceryList({ ...blocked, items: bulk.items }), 'read-failed')
+  storage.getItem.mock.restore()
+  for (const [raw, status] of [['{broken', 'invalid'], [JSON.stringify([bawang, null]), 'partial']]) {
+    values.set(key, raw)
+    const recovered = loadGroceryList()
+    const { items } = recoverGroceryItems(recovered.items, bulk.items)
+    assert.deepEqual(items, [...recovered.items, ...bulk.added])
+    assert.equal(saveGroceryList({ ...recovered, items }), status)
     assert.equal(values.get(key), raw)
   }
   assert.equal(storage.setItem.mock.callCount(), 0)
