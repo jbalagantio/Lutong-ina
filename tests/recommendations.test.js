@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  advanceRecommendationSession,
   compareRecipeIngredients,
   getAvailableIngredientNames,
+  getEligibleRecommendations,
+  getRecipeMatches,
   rankPantryRecommendations,
+  refreshPantryRound,
+  selectCookingMode,
   selectNextRecommendation,
 } from '../src/utils/recommendations.js'
 
@@ -149,9 +154,98 @@ test('selects only unseen recipes, preserves rank when requested, and stops when
   const matches = ['First', 'Second', 'Third'].map((name) =>
     compareRecipeIngredients(makeRecipe(name, ['Garlic']), getAvailableIngredientNames(available('Garlic'))),
   )
-  assert.equal(selectNextRecommendation(matches, [], false), matches[0])
-  assert.equal(selectNextRecommendation(matches, ['first'], false), matches[1])
-  assert.equal(selectNextRecommendation(matches, ['first', 'third'], true), matches[1])
-  assert.equal(selectNextRecommendation(matches, ['first', 'second', 'third'], true), null)
-  assert.equal(selectNextRecommendation([matches[0]], ['first'], false), null)
+  assert.equal(selectNextRecommendation(matches, []), matches[0])
+  assert.equal(selectNextRecommendation(matches, ['first']), matches[1])
+  assert.equal(selectNextRecommendation(matches, ['first', 'third'], 0.75), matches[1])
+  assert.equal(selectNextRecommendation(matches, ['first', 'second', 'third'], 0.75), null)
+  assert.equal(selectNextRecommendation([matches[0]], ['first']), null)
+})
+
+const newSession = () => ({ mode: null, rounds: {} })
+const sessionRecipes = [
+  makeRecipe('Adobo', ['Garlic', 'Soy sauce'], 40),
+  makeRecipe('Omelette', ['Egg'], 15),
+  makeRecipe('Soup', ['Garlic', 'Ginger', 'Cabbage'], 25),
+]
+
+test('first selection starts an independent round and revisiting a mode restores it', () => {
+  const matches = getRecipeMatches(sessionRecipes, available('Egg', 'Garlic'))
+  const pantry = selectCookingMode(newSession(), 'pantry', matches, 0.99)
+  assert.deepEqual(pantry.rounds.pantry, { currentId: 'omelette', suggestedIds: ['omelette'] })
+  const shopping = selectCookingMode(pantry, 'shopping', matches, 0)
+  const nextShopping = advanceRecommendationSession(shopping, matches, 0.9, false)
+  const exploration = selectCookingMode(nextShopping, 'new', matches, 0.4)
+  assert.deepEqual(exploration.rounds.new, { currentId: 'omelette', suggestedIds: ['omelette'] })
+  assert.deepEqual(exploration.rounds.shopping, { currentId: 'soup', suggestedIds: ['adobo', 'soup'] })
+  assert.equal(selectCookingMode(exploration, 'pantry', matches, 0).rounds.pantry, pantry.rounds.pantry)
+  assert.equal(selectCookingMode(exploration, 'shopping', matches, 0).rounds.shopping, nextShopping.rounds.shopping)
+  assert.equal(selectCookingMode(exploration, 'new', matches, 0), exploration)
+})
+
+test('queued actions using the same draw select distinct recipes, and randomized restart skips the last dish', () => {
+  const matches = getRecipeMatches(sessionRecipes, [])
+  for (const mode of ['shopping', 'new']) {
+    const initial = selectCookingMode(newSession(), mode, matches, 0.99)
+    const advance = (session) => advanceRecommendationSession(session, matches, 0, false)
+    const exhausted = [advance, advance, advance].reduce((session, action) => action(session), initial)
+    assert.deepEqual(exhausted.rounds[mode], { currentId: 'omelette', suggestedIds: ['soup', 'adobo', 'omelette'] })
+    assert.equal(advance(exhausted), exhausted)
+    const restarted = advanceRecommendationSession(exhausted, matches, 0.99, true)
+    assert.deepEqual(restarted.rounds[mode], { currentId: 'soup', suggestedIds: ['soup'] })
+    assert.equal(advanceRecommendationSession(restarted, matches, 0, true), restarted)
+  }
+})
+
+test('eligible current recipes keep their IDs while percentages and ingredient lists update', () => {
+  const initialMatches = getRecipeMatches(sessionRecipes, available('Garlic'))
+  const updatedMatches = getRecipeMatches(sessionRecipes, available('Garlic', 'Soy sauce', 'Egg'))
+  const pantry = selectCookingMode(newSession(), 'pantry', initialMatches, 0)
+  assert.equal(initialMatches[0].matchPercentage, 50)
+  assert.equal(updatedMatches[0].matchPercentage, 100)
+  assert.deepEqual(updatedMatches[0].missingIngredients, [])
+  assert.equal(refreshPantryRound(pantry, updatedMatches), pantry)
+  const shopping = selectCookingMode(pantry, 'shopping', initialMatches, 0)
+  const exploration = selectCookingMode(shopping, 'new', initialMatches, 0.99)
+  const allUnavailable = getRecipeMatches(sessionRecipes, [])
+  const refreshed = refreshPantryRound(exploration, allUnavailable)
+  assert.equal(refreshed.rounds.shopping, shopping.rounds.shopping)
+  assert.equal(refreshed.rounds.new, exploration.rounds.new)
+  assert.equal(allUnavailable[0].matchPercentage, 0)
+})
+
+test('pantry changes select the next unseen eligible dish and keep the previous round history', () => {
+  const onlyEggs = getRecipeMatches(sessionRecipes, available('Egg'))
+  const onlyGarlic = getRecipeMatches(sessionRecipes, available('Garlic'))
+  const pantry = selectCookingMode(newSession(), 'pantry', onlyEggs, 0)
+  const shopping = selectCookingMode(pantry, 'shopping', onlyEggs, 0)
+  const returned = selectCookingMode(shopping, 'pantry', onlyGarlic, 0.99)
+  assert.deepEqual(returned.rounds.pantry, { currentId: 'adobo', suggestedIds: ['omelette', 'adobo'] })
+  assert.equal(returned.rounds.shopping, shopping.rounds.shopping)
+  const exhausted = refreshPantryRound(returned, onlyEggs)
+  assert.deepEqual(exhausted.rounds.pantry, { currentId: null, suggestedIds: ['omelette', 'adobo'] })
+  const restarted = advanceRecommendationSession(exhausted, onlyEggs, 0.99, true)
+  assert.deepEqual(restarted.rounds.pantry, { currentId: 'omelette', suggestedIds: ['omelette'] })
+  assert.equal(restarted.rounds.shopping, shopping.rounds.shopping)
+})
+
+test('pantry handles zero and one eligible dish and accepts newly eligible unseen recipes', () => {
+  for (const ingredients of [[], [{ name: 'Egg', isAvailable: false }], available('Chocolate')]) {
+    const matches = getRecipeMatches(sessionRecipes, ingredients)
+    assert.deepEqual(getEligibleRecommendations('pantry', matches), [])
+    const session = selectCookingMode(newSession(), 'pantry', matches, 0.8)
+    assert.deepEqual(session.rounds.pantry, { currentId: null, suggestedIds: [] })
+    assert.equal(advanceRecommendationSession(session, matches, 0.8, true), session)
+    const onlyEggs = getRecipeMatches(sessionRecipes, available('Egg'))
+    const recovered = refreshPantryRound(session, onlyEggs)
+    assert.deepEqual(recovered.rounds.pantry, { currentId: 'omelette', suggestedIds: ['omelette'] })
+    assert.equal(advanceRecommendationSession(recovered, onlyEggs, 0.8, false), recovered)
+    assert.equal(advanceRecommendationSession(recovered, onlyEggs, 0.8, true), recovered)
+    const expanded = getRecipeMatches(sessionRecipes, available('Egg', 'Garlic'))
+    assert.equal(refreshPantryRound(recovered, expanded), recovered)
+    const next = advanceRecommendationSession(recovered, expanded, 0.99, false)
+    assert.deepEqual(next.rounds.pantry, { currentId: 'adobo', suggestedIds: ['omelette', 'adobo'] })
+    const end = advanceRecommendationSession(next, expanded, 0.99, false)
+    assert.equal(end.rounds.pantry.currentId, 'soup')
+    assert.equal(advanceRecommendationSession(end, expanded, 0.99, true).rounds.pantry.currentId, 'omelette')
+  }
 })

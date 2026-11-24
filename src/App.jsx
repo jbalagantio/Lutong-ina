@@ -5,7 +5,15 @@ import Home from './components/Home.jsx'
 import MyDishes from './components/MyDishes.jsx'
 import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
+import recipes from './data/recipes.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
+import {
+  advanceRecommendationSession,
+  getEligibleRecommendations,
+  getRecipeMatches,
+  refreshPantryRound,
+  selectCookingMode,
+} from './utils/recommendations.js'
 import './App.css'
 
 const storageWarnings = {
@@ -19,14 +27,22 @@ const storageWarnings = {
 const App = () => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [pantry, setPantry] = useState(loadPantry)
+  const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const latestPantry = useRef(pantry)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
 
   const commitPantry = (nextPantry) => {
     // Consecutive actions can run before React renders the previous update.
+    const ingredientsChanged = latestPantry.current.ingredients !== nextPantry.ingredients
     latestPantry.current = nextPantry
     setPantry(nextPantry)
+    if (ingredientsChanged && activeScreen === 'home') {
+      const matches = getRecipeMatches(recipes, nextPantry.ingredients)
+      setRecommendationSession((session) => (
+        session.mode === 'pantry' ? refreshPantryRound(session, matches) : session
+      ))
+    }
   }
 
   const saveAndCommitPantry = (nextPantry) => {
@@ -114,11 +130,28 @@ const App = () => {
   }
 
   const handleNavigate = (screen) => {
+    if (screen === 'home') {
+      const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+      setRecommendationSession((session) => (
+        session.mode === 'pantry' ? refreshPantryRound(session, matches) : session
+      ))
+    }
     setActiveScreen(screen)
   }
 
-  let screen = <Home ingredients={pantry.ingredients} onOpenPantry={() => handleNavigate('pantry')} />
+  const handleSelectMode = (mode) => {
+    const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+    const randomValue = Math.random()
+    setRecommendationSession((session) => selectCookingMode(session, mode, matches, randomValue))
+  }
 
+  const handleSuggestionAction = (restart) => {
+    const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
+    const randomValue = Math.random()
+    setRecommendationSession((session) => advanceRecommendationSession(session, matches, randomValue, restart))
+  }
+
+  let screen
   if (activeScreen === 'my-dishes') {
     screen = <MyDishes />
   } else if (activeScreen === 'pantry') {
@@ -133,6 +166,20 @@ const App = () => {
     )
   } else if (activeScreen === 'discover') {
     screen = <Discover />
+  } else {
+    const { mode, rounds } = recommendationSession
+    const matches = mode ? getRecipeMatches(recipes, pantry.ingredients) : []
+    screen = (
+      <Home
+        ingredients={pantry.ingredients}
+        mode={mode}
+        round={rounds[mode]}
+        eligibleMatches={getEligibleRecommendations(mode, matches)}
+        onSelectMode={handleSelectMode}
+        onSuggestionAction={handleSuggestionAction}
+        onOpenPantry={() => handleNavigate('pantry')}
+      />
+    )
   }
 
   return (

@@ -1,11 +1,3 @@
-import { useState } from 'react'
-import recipes from '../data/recipes.js'
-import {
-  compareRecipeIngredients,
-  getAvailableIngredientNames,
-  rankPantryRecommendations,
-  selectNextRecommendation,
-} from '../utils/recommendations.js'
 import RecommendationCard from './RecommendationCard.jsx'
 
 const cookingOptions = [
@@ -26,68 +18,39 @@ const cookingOptions = [
   },
 ]
 
-const Home = ({ ingredients, onOpenPantry }) => {
-  const [mode, setMode] = useState(null)
-  const [suggestedIds, setSuggestedIds] = useState([])
-
-  const availableNames = getAvailableIngredientNames(ingredients)
-  const recipeMatches = recipes.map((recipe) => compareRecipeIngredients(recipe, availableNames))
-  const pantryMatches = rankPantryRecommendations(recipeMatches)
-  const eligibleMatches = mode === 'pantry' ? pantryMatches : recipeMatches
-  const currentId = suggestedIds.at(-1)
-  const currentMatch = eligibleMatches.find((match) => match.recipe.id === currentId)
-  const hasMore = eligibleMatches.some((match) => !suggestedIds.includes(match.recipe.id))
-
-  const handleSelectMode = (nextMode) => {
-    if (nextMode === mode) {
-      return
-    }
-
-    const matches = nextMode === 'pantry' ? pantryMatches : recipeMatches
-    const firstMatch = selectNextRecommendation(matches, [], nextMode !== 'pantry')
-    setMode(nextMode)
-    setSuggestedIds(firstMatch ? [firstMatch.recipe.id] : [])
-  }
-
-  const handleNextSuggestion = () => {
-    const nextMatch = selectNextRecommendation(eligibleMatches, suggestedIds, mode !== 'pantry')
-    if (nextMatch) {
-      setSuggestedIds((previousIds) => [...previousIds, nextMatch.recipe.id])
-    }
-  }
-
-  const handleRestart = () => {
-    // Random modes start a new round with a dish different from the one on screen.
-    const excludedIds = mode === 'pantry' ? [] : [currentId]
-    const firstMatch = selectNextRecommendation(eligibleMatches, excludedIds, mode !== 'pantry')
-    setSuggestedIds(firstMatch ? [firstMatch.recipe.id] : [])
-  }
+const Home = ({ ingredients, mode, round, eligibleMatches, onSelectMode, onSuggestionAction, onOpenPantry }) => {
+  const currentMatch = eligibleMatches.find((match) => match.recipe.id === round?.currentId)
+  const hasMore = eligibleMatches.some((match) => !round.suggestedIds.includes(match.recipe.id))
 
   let emptyMessage = 'No recipes available.'
 
   if (mode === 'pantry') {
     if (ingredients.length === 0) {
       emptyMessage = 'Your pantry is empty.'
-    } else if (availableNames.size === 0) {
+    } else if (!ingredients.some((ingredient) => ingredient.isAvailable === true)) {
       emptyMessage = 'All pantry ingredients are out of stock.'
     } else {
       emptyMessage = 'No recipes match your pantry.'
     }
   }
 
+  const isExhausted = eligibleMatches.length > 0 && !hasMore
+  const canRestart = isExhausted && (eligibleMatches.length > 1 || !currentMatch)
   let suggestionStatus = ''
   if (currentMatch && eligibleMatches.length === 1) {
     suggestionStatus = 'Only one dish available in this mode.'
-  } else if (mode && eligibleMatches.length > 0 && !hasMore) {
+  } else if (isExhausted) {
     suggestionStatus = 'You’ve seen all the recipes in this round.'
   }
 
-  const showEmptyState = !currentMatch && (mode !== 'pantry' || eligibleMatches.length === 0)
+  const showEmptyState = !currentMatch && eligibleMatches.length === 0
   let announcement = ''
   if (currentMatch) {
     announcement = `${currentMatch.recipe.name}. ${suggestionStatus}`
   } else if (mode && showEmptyState) {
     announcement = emptyMessage
+  } else if (suggestionStatus) {
+    announcement = suggestionStatus
   }
 
   return (
@@ -101,7 +64,7 @@ const Home = ({ ingredients, onOpenPantry }) => {
                 className={`option-card option-${option.id}`}
                 type="button"
                 aria-pressed={mode === option.id}
-                onClick={() => handleSelectMode(option.id)}
+                onClick={() => onSelectMode(option.id)}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d={option.icon} />
@@ -131,7 +94,7 @@ const Home = ({ ingredients, onOpenPantry }) => {
               {mode === 'pantry' && (
                 <div className="pantry-actions">
                   <button className="pantry-button" type="button" onClick={onOpenPantry}>Open Pantry</button>
-                  <button className="pantry-button" type="button" onClick={() => handleSelectMode('shopping')}>
+                  <button className="pantry-button" type="button" onClick={() => onSelectMode('shopping')}>
                     Try grocery mode
                   </button>
                 </div>
@@ -139,11 +102,11 @@ const Home = ({ ingredients, onOpenPantry }) => {
             </div>
           )}
           {suggestionStatus && <p className="suggestion-status">{suggestionStatus}</p>}
-          {(eligibleMatches.length > 1 || (!currentMatch && hasMore)) && (
+          {(hasMore || canRestart) && (
             <button
               className="pantry-button pantry-primary suggestion-action"
               type="button"
-              onClick={hasMore ? handleNextSuggestion : handleRestart}
+              onClick={() => onSuggestionAction(canRestart)}
             >
               {hasMore ? 'Suggest another' : 'Restart suggestions'}
             </button>

@@ -23,7 +23,7 @@ Choose one of three cooking modes on **Home**:
 - **I'll go grocery shopping** draws from all 15 Filipino recipes and shows which ingredients to shop for.
 - **Something new** draws from recipes you have yet to see in the current round.
 
-Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Suggestion rounds reset when changing modes or leaving Home. Pantry data stays in this browser, and the app shows a warning if storage fails. Recipe browsing, recipe details, and My Dishes management are planned for later phases.
+Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Each cooking mode keeps its own suggestion round while you navigate. Refreshing starts a new session. If a pantry suggestion loses its last match, the app moves to the next eligible unseen recipe when one exists. Pantry data stays in this browser, and the app shows a warning if storage fails. Recipe browsing, recipe details, and My Dishes management are planned for later phases.
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 
