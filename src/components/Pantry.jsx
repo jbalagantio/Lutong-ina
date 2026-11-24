@@ -12,6 +12,9 @@ const Pantry = ({
   groceryList,
   onRetryGroceryList,
   onReplaceGroceryList,
+  onSaveGroceryItem,
+  onRemoveGroceryItem,
+  onGroceryDraftChange,
 }) => {
   const [activeView, setActiveView] = useState('ingredients')
   const showIngredients = activeView === 'ingredients'
@@ -188,9 +191,16 @@ const Pantry = ({
           </ul>
         )}
       </div>
-      {!showIngredients && (
-        <GroceryList groceryList={groceryList} onRetry={onRetryGroceryList} onReplace={onReplaceGroceryList} />
-      )}
+      <div hidden={showIngredients}>
+        <GroceryList
+          groceryList={groceryList}
+          onRetry={onRetryGroceryList}
+          onReplace={onReplaceGroceryList}
+          onSave={onSaveGroceryItem}
+          onRemove={onRemoveGroceryItem}
+          onDraftChange={onGroceryDraftChange}
+        />
+      </div>
     </section>
   )
 }

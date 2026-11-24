@@ -23,9 +23,9 @@ Personal recipe photos are optional. Choose a JPEG, PNG, or WebP up to 10 MB. Ph
 
 Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty. **Ingredients** is the default view. Switching to **Grocery List** and back keeps the current ingredient filters and any open draft while Pantry stays mounted.
 
-**Grocery List** starts empty and displays saved items by purchase status. Its browser storage key is `lutong-ina-grocery-list`. The app reads the list without writing on startup. If a read fails, retry loading. If data is invalid or partly recoverable, replacement requires confirmation and keeps the recoverable items. Manual item changes, purchase toggling, and recipe-driven additions are deferred.
+**Grocery List** starts empty and supports adding, editing, and removing items. Names are trimmed, must fit the 80-character ingredient name limit, and need a pantry category. New alias-equivalent duplicates such as Garlic and Bawang are blocked. Old entries can keep their current ingredient identity. Search matches English and Filipino names, including partial aliases, and works together with the category filter. Purchase counts use the full list. Purchase toggling and recipe-driven additions are deferred.
 
-Future grocery mutations must update the App-owned list and use the protected save utility with the current storage status. Only the confirmed replacement flow may authorize writing over invalid or partially recovered data.
+Both Pantry views keep their drafts and filters when switching. Leaving Pantry with a changed grocery draft asks for confirmation. Accepted grocery changes save to `lutong-ina-grocery-list` in the current browser. Loading does not write on startup. After a failed read, retry merges saved items with the surviving session items, assigns new IDs to colliding session items, and keeps valid legacy aliases. Invalid or partial storage stays protected until confirmed replacement. If saving fails, current changes stay in memory and can be lost on refresh. Grocery storage is local to this browser and does not synchronize concurrent edits across tabs.
 
 Choose one of three cooking modes on **Home**:
 

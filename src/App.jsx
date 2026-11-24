@@ -20,7 +20,7 @@ import {
   toggleRecipePreference,
 } from './utils/myDishes.js'
 import { reconcileRecipePhotos, saveRecipePhoto } from './utils/recipePhotos.js'
-import { loadGroceryList, saveGroceryList } from './utils/groceryList.js'
+import { loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem, saveGroceryList } from './utils/groceryList.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -57,6 +57,8 @@ const App = ({ canReconcilePhotos }) => {
   const mainContent = useRef(null)
   const hasNavigated = useRef(false)
   const latestPantry = useRef(pantry)
+  const latestGroceryList = useRef(groceryList)
+  const groceryDraftChanged = useRef(false)
   const latestDishes = useRef(myDishes)
   const pendingLibraryChanges = useRef(new Map())
   const recipeDraftChanged = useRef(false)
@@ -147,20 +149,60 @@ const App = ({ canReconcilePhotos }) => {
     }
   }
 
-  const handleRetryGroceryList = () => {
-    if (groceryList.storageStatus === 'read-failed') {
-      const recoveredList = loadGroceryList()
-      setGroceryList(recoveredList)
-      return recoveredList.storageStatus
-    }
+  const commitGroceryList = (nextList) => {
+    latestGroceryList.current = nextList
+    setGroceryList(nextList)
+  }
 
-    const storageStatus = saveGroceryList(groceryList)
-    setGroceryList({ ...groceryList, storageStatus })
+  const saveAndCommitGroceryList = (nextList) => {
+    const storageStatus = saveGroceryList(nextList)
+    const saved = storageStatus === 'ready'
+    commitGroceryList({
+      ...nextList,
+      storageStatus,
+      hasUnsavedChanges: !saved && nextList.hasUnsavedChanges,
+      replacementError: saved ? undefined : nextList.replacementError,
+    })
     return storageStatus
   }
 
+  const handleSaveGroceryItem = (values, id) => {
+    const current = latestGroceryList.current
+    const result = prepareGroceryItem(current.items, values, id)
+    if (result.error) return result
+    saveAndCommitGroceryList({ ...current, items: result.items, hasUnsavedChanges: true })
+    return result
+  }
+
+  const handleRemoveGroceryItem = (id) => {
+    const current = latestGroceryList.current
+    const items = removeGroceryItem(current.items, id)
+    if (items === current.items) return
+    const hasUnsavedChanges = current.storageStatus !== 'read-failed' || items.length > 0
+    saveAndCommitGroceryList({ ...current, items, hasUnsavedChanges })
+  }
+
+  const handleRetryGroceryList = () => {
+    const current = latestGroceryList.current
+    if (current.storageStatus !== 'read-failed') {
+      return { storageStatus: saveAndCommitGroceryList(current) }
+    }
+
+    const recovered = loadGroceryList()
+    if (recovered.storageStatus === 'read-failed') return recovered
+    if (current.items.length === 0) {
+      commitGroceryList(recovered)
+      return recovered
+    }
+
+    const { items, remappedIds } = recoverGroceryItems(recovered.items, current.items)
+    const storageStatus = saveAndCommitGroceryList({ ...recovered, items, hasUnsavedChanges: true })
+    return { storageStatus, remappedIds }
+  }
+
   const handleReplaceGroceryList = () => {
-    const { items, storageStatus } = groceryList
+    const current = latestGroceryList.current
+    const { items, storageStatus } = current
     if (storageStatus !== 'invalid' && storageStatus !== 'partial') return false
     if (!window.confirm('Replace the saved grocery list with the items currently shown? Unreadable entries will be lost.')) {
       return false
@@ -168,9 +210,9 @@ const App = ({ canReconcilePhotos }) => {
 
     const result = saveGroceryList({ items, storageStatus: 'ready' })
     if (result === 'ready') {
-      setGroceryList({ items, storageStatus: result })
+      commitGroceryList({ items, storageStatus: result })
     } else {
-      setGroceryList({ ...groceryList, replacementError: result })
+      commitGroceryList({ ...current, replacementError: result })
     }
     return result === 'ready'
   }
@@ -387,6 +429,13 @@ const App = ({ canReconcilePhotos }) => {
   }
 
   const handleNavigate = (screen, trigger) => {
+    if (activeScreen === 'pantry' && screen !== activeScreen) {
+      if (groceryDraftChanged.current && !window.confirm('Discard unsaved grocery item changes?')) {
+        trigger?.focus()
+        return
+      }
+      groceryDraftChanged.current = false
+    }
     if (activeScreen === 'my-dishes' && screen !== activeScreen) {
       if (!canDiscardRecipeDraft()) {
         trigger?.focus()
@@ -455,6 +504,9 @@ const App = ({ canReconcilePhotos }) => {
         groceryList={groceryList}
         onRetryGroceryList={handleRetryGroceryList}
         onReplaceGroceryList={handleReplaceGroceryList}
+        onSaveGroceryItem={handleSaveGroceryItem}
+        onRemoveGroceryItem={handleRemoveGroceryItem}
+        onGroceryDraftChange={(changed) => { groceryDraftChanged.current = changed }}
       />
     )
   } else if (activeScreen === 'discover') {

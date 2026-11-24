@@ -1,6 +1,64 @@
-import { pantryCategories, pantryNameLimit } from './pantry.js'
+import { matchesIngredientSearch, normalizeIngredientName, pantryCategories, pantryNameLimit, wouldDuplicateIngredient } from './pantry.js'
 
 const storageKey = 'lutong-ina-grocery-list'
+
+const makeUniqueId = (usedIds) => {
+  let id = crypto.randomUUID()
+  while (usedIds.has(id)) id = crypto.randomUUID()
+  return id
+}
+
+export const prepareGroceryItem = (items, values, id = null) => {
+  const current = items.find((item) => item.id === id)
+  if (id !== null && !current) return { error: 'This grocery item is no longer available.' }
+
+  const name = typeof values.name === 'string' ? values.name.trim() : ''
+  if (!name) return { field: 'name', error: 'Enter an item name.' }
+  if (name.length > pantryNameLimit) {
+    return { field: 'name', error: `Use ${pantryNameLimit} characters or fewer for the item name.` }
+  }
+  if (!pantryCategories.includes(values.category)) return { field: 'category', error: 'Select a valid category.' }
+  if (wouldDuplicateIngredient(name, items, current)) {
+    return { field: 'name', error: 'That item is already on your grocery list.' }
+  }
+
+  const item = {
+    id: current?.id ?? makeUniqueId(new Set(items.map((entry) => entry.id))),
+    name,
+    category: values.category,
+    isPurchased: current?.isPurchased ?? false,
+  }
+  const nextItems = current
+    ? items.map((entry) => entry === current ? item : entry)
+    : [...items, item]
+  return { item, items: nextItems }
+}
+
+export const removeGroceryItem = (items, id) => {
+  if (!items.some((item) => item.id === id)) return items
+  return items.filter((item) => item.id !== id)
+}
+
+export const filterGroceryItems = (items, search, category) => {
+  const term = normalizeIngredientName(search)
+  return items.filter((item) => (
+    (!category || item.category === category) && matchesIngredientSearch(item.name, term)
+  ))
+}
+
+export const recoverGroceryItems = (recoveredItems, sessionItems) => {
+  const recoveredIds = new Set(recoveredItems.map((item) => item.id))
+  const usedIds = new Set([...recoveredIds, ...sessionItems.map((item) => item.id)])
+  const remappedIds = new Map()
+  const recoveredSessionItems = sessionItems.map((item) => {
+    if (!recoveredIds.has(item.id)) return item
+    const id = makeUniqueId(usedIds)
+    usedIds.add(id)
+    remappedIds.set(item.id, id)
+    return { ...item, id }
+  })
+  return { items: [...recoveredItems, ...recoveredSessionItems], remappedIds }
+}
 
 export const loadGroceryList = () => {
   let raw

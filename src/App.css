@@ -333,6 +333,16 @@ h1 {
   font-size: clamp(1.4rem, 2.5vw, 1.75rem);
 }
 
+.pantry-fields.grocery-filters {
+  margin-top: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
+}
+
+.grocery-filters input,
+.grocery-filters select {
+  min-width: 0;
+}
+
 .grocery-warning,
 .grocery-count,
 .grocery-group {
