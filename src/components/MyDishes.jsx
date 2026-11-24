@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { normalizeRecipeName } from '../utils/myDishes.js'
+import { hasDuplicateRecipeNames, normalizeRecipeName } from '../utils/myDishes.js'
 import RecipeForm from './RecipeForm.jsx'
 
 const storageWarnings = {
@@ -8,7 +8,7 @@ const storageWarnings = {
   partial: 'Only some saved data could be recovered. Changes stay in memory until you confirm replacement.',
   'write-failed': 'Could not save My Dishes. Changes stay in memory.',
   'quota-exceeded': 'Browser storage is full. Changes stay in memory.',
-  'duplicate-names': 'Some recovered recipes share a name. Rename or delete the duplicates before saving.',
+  'duplicate-names': 'Some recipes share a name. Rename or delete the duplicates before saving.',
 }
 
 const MyDishes = ({
@@ -25,14 +25,21 @@ const MyDishes = ({
   const [search, setSearch] = useState('')
   const addButton = useRef(null)
   const formTrigger = useRef(null)
+  const nextEditorKey = useRef(0)
   const searchTerm = normalizeRecipeName(search)
   const visibleRecipes = personalRecipes.filter((recipe) => normalizeRecipeName(recipe.name).includes(searchTerm))
-  const warning = storageWarnings[storageStatus]
+  const warning = storageStatus === 'duplicate-names' ? '' : storageWarnings[storageStatus]
+  const hasNameConflict = hasDuplicateRecipeNames(personalRecipes)
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
 
   const openEditor = (event, recipe) => {
+    if (editor && editor.recipe === recipe) {
+      return
+    }
     formTrigger.current = event.currentTarget
-    setEditor({ recipe })
+    const key = nextEditorKey.current
+    nextEditorKey.current += 1
+    setEditor({ recipe, key })
   }
 
   const closeEditor = (returnToTrigger = true) => {
@@ -45,10 +52,11 @@ const MyDishes = ({
     formTrigger.current = null
   }
 
-  const handleSave = (values, id) => {
-    const error = onSaveRecipe(values, id)
+  const handleSave = (values) => {
+    const recipe = editor.recipe
+    const error = onSaveRecipe(values, recipe)
     if (!error) {
-      closeEditor(!id || normalizeRecipeName(values.name).includes(searchTerm))
+      closeEditor(!recipe || normalizeRecipeName(values.name).includes(searchTerm))
     }
     return error
   }
@@ -57,13 +65,42 @@ const MyDishes = ({
     if (!window.confirm(`Delete "${recipe.name}" from My Dishes?`)) {
       return
     }
-    onDeleteRecipe(recipe.id)
+    if (!onDeleteRecipe(recipe)) {
+      return
+    }
     if (expandedId === recipe.id) {
       setExpandedId(null)
     }
     if (editor?.recipe?.id === recipe.id) {
       closeEditor(false)
     } else {
+      addButton.current?.focus()
+    }
+  }
+
+  const handleRetryStorage = () => {
+    const result = onRetryStorage()
+    if (!result) {
+      return
+    }
+
+    const { remappedRecipes, status } = result
+    if (remappedRecipes.size > 0) {
+      // Keep the form key stable so recovery preserves the draft.
+      setEditor((previous) => {
+        const recipe = remappedRecipes.get(previous?.recipe?.id)
+        return recipe ? { ...previous, recipe } : previous
+      })
+      setExpandedId((previousId) => remappedRecipes.get(previousId)?.id ?? previousId)
+      formTrigger.current = null
+    }
+    if (status === 'ready' || status === 'duplicate-names' || status === 'invalid' || status === 'partial') {
+      addButton.current?.focus()
+    }
+  }
+
+  const handleReplaceStorage = () => {
+    if (onReplaceStorage()) {
       addButton.current?.focus()
     }
   }
@@ -76,14 +113,17 @@ const MyDishes = ({
           Add recipe
         </button>
       </div>
-      {warning && (
+      {(warning || hasNameConflict) && (
         <div className="storage-warning dishes-warning">
-          <p role="alert">{warning}{replacementError && ` ${storageWarnings[replacementError]}`}</p>
-          {needsReplacement && (
-            <button className="pantry-button" type="button" onClick={onReplaceStorage}>Replace saved data</button>
+          <p role="alert">
+            {[warning, hasNameConflict && storageWarnings['duplicate-names'], storageWarnings[replacementError]]
+              .filter(Boolean).join(' ')}
+          </p>
+          {needsReplacement && !hasNameConflict && (
+            <button className="pantry-button" type="button" onClick={handleReplaceStorage}>Replace saved data</button>
           )}
-          {!needsReplacement && storageStatus !== 'duplicate-names' && (
-            <button className="pantry-button" type="button" onClick={onRetryStorage}>
+          {!needsReplacement && !hasNameConflict && (
+            <button className="pantry-button" type="button" onClick={handleRetryStorage}>
               {storageStatus === 'read-failed' ? 'Retry loading' : 'Retry saving'}
             </button>
           )}
@@ -91,7 +131,7 @@ const MyDishes = ({
       )}
       {editor && (
         <RecipeForm
-          key={editor.recipe?.id ?? 'new-recipe'}
+          key={editor.key}
           recipe={editor.recipe}
           onSave={handleSave}
           onCancel={() => closeEditor()}

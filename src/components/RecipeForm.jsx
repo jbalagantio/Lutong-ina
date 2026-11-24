@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { recipeDifficulties, recipeLimits } from '../utils/myDishes.js'
 
 const blankIngredient = { name: '', quantity: '', unit: '' }
@@ -22,6 +22,7 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
   const [error, setError] = useState('')
   const nextRowId = useRef(0)
   const pendingFocus = useRef(null)
+  const rowInputs = useRef(new Map())
   const addIngredientButton = useRef(null)
   const addStepButton = useRef(null)
 
@@ -37,44 +38,51 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
   }
 
   const addRow = (list, values) => {
-    if (draft[list].length >= recipeLimits[list]) {
-      return
-    }
     const key = `new-row-${nextRowId.current}`
     nextRowId.current += 1
-    pendingFocus.current = key
-    setDraft((previous) => ({
-      ...previous,
-      [list]: [...previous[list], { ...values, key }],
-    }))
+    pendingFocus.current = { list, key }
+    setDraft((previous) => {
+      if (previous[list].length >= recipeLimits[list]) {
+        return previous
+      }
+      return { ...previous, [list]: [...previous[list], { ...values, key }] }
+    })
   }
 
-  const removeRow = (list, index, addButton) => {
-    const rows = draft[list]
-    const neighbor = rows[index + 1] ?? rows[index - 1]
-    if (neighbor) {
-      pendingFocus.current = neighbor.key
-    } else {
-      addButton.current?.focus()
-    }
-    const key = rows[index].key
+  const removeRow = (list, key, index) => {
+    pendingFocus.current = { list, index }
     setDraft((previous) => ({
       ...previous,
       [list]: previous[list].filter((row) => row.key !== key),
     }))
   }
 
-  const focusRow = (element, key) => {
-    if (element && pendingFocus.current === key) {
-      pendingFocus.current = null
-      element.focus()
+  const trackRowInput = (key, element) => {
+    if (element) {
+      rowInputs.current.set(key, element)
+    } else {
+      rowInputs.current.delete(key)
     }
   }
+
+  useLayoutEffect(() => {
+    const request = pendingFocus.current
+    if (!request) {
+      return
+    }
+    pendingFocus.current = null
+    const rows = draft[request.list]
+    const nearbyKey = (rows[request.index] ?? rows.at(-1))?.key
+    const input = rowInputs.current.get(request.key) ?? rowInputs.current.get(nearbyKey)
+    const addButton = request.list === 'ingredients' ? addIngredientButton : addStepButton
+    const focusTarget = input ?? addButton.current
+    focusTarget?.focus()
+  }, [draft])
 
   const handleSubmit = (event) => {
     event.preventDefault()
     const values = { ...draft, instructions: draft.instructions.map((step) => step.text) }
-    const validationError = onSave(values, recipe?.id)
+    const validationError = onSave(values)
     if (validationError) {
       setError(validationError)
     }
@@ -111,7 +119,7 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
         {draft.ingredients.map((ingredient, index) => (
           <div className="recipe-ingredient-row" key={ingredient.key}>
             <label>Ingredient {index + 1}
-              <input ref={(element) => focusRow(element, ingredient.key)} value={ingredient.name} onChange={(event) => updateRow('ingredients', ingredient.key, 'name', event.target.value)} required />
+              <input ref={(element) => trackRowInput(ingredient.key, element)} value={ingredient.name} onChange={(event) => updateRow('ingredients', ingredient.key, 'name', event.target.value)} required />
             </label>
             <label>Quantity<span className="visually-hidden"> for ingredient {index + 1}</span>
               <input type="number" step="any" min="0" value={ingredient.quantity} onChange={(event) => updateRow('ingredients', ingredient.key, 'quantity', event.target.value)} required />
@@ -119,7 +127,7 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
             <label>Unit<span className="visually-hidden"> for ingredient {index + 1}</span>
               <input value={ingredient.unit} onChange={(event) => updateRow('ingredients', ingredient.key, 'unit', event.target.value)} required />
             </label>
-            <button className="pantry-button" type="button" onClick={() => removeRow('ingredients', index, addIngredientButton)}>
+            <button className="pantry-button" type="button" onClick={() => removeRow('ingredients', ingredient.key, index)}>
               Remove<span className="visually-hidden"> ingredient {index + 1}</span>
             </button>
           </div>
@@ -133,9 +141,9 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
         {draft.instructions.map((step, index) => (
           <div className="recipe-step-row" key={step.key}>
             <label>Step {index + 1}
-              <textarea ref={(element) => focusRow(element, step.key)} rows="2" value={step.text} onChange={(event) => updateRow('instructions', step.key, 'text', event.target.value)} required />
+              <textarea ref={(element) => trackRowInput(step.key, element)} rows="2" value={step.text} onChange={(event) => updateRow('instructions', step.key, 'text', event.target.value)} required />
             </label>
-            <button className="pantry-button" type="button" onClick={() => removeRow('instructions', index, addStepButton)}>
+            <button className="pantry-button" type="button" onClick={() => removeRow('instructions', step.key, index)}>
               Remove<span className="visually-hidden"> step {index + 1}</span>
             </button>
           </div>

@@ -3,6 +3,7 @@ import { webcrypto } from 'node:crypto'
 import { test } from 'node:test'
 import builtInRecipes from '../src/data/recipes.js'
 import {
+  hasDuplicateRecipeNames,
   loadMyDishes,
   mergeRecoveredPersonalRecipes,
   preparePersonalRecipe,
@@ -178,4 +179,66 @@ test('keeps recovered and session recipes, assigning a new session ID only on a 
   assert.equal(saveMyDishes({
     personalRecipes: [example, { ...example, id }], libraryEntries, storageStatus: 'ready',
   }), 'duplicate-names')
+})
+
+test('reports loaded duplicates, retains both records, and saves after a rename', (context) => {
+  const duplicate = { ...example, id: 'second', name: ' CHICKEN\t  ADOBO ' }
+  const original = JSON.stringify({ personalRecipes: [example, duplicate], libraryEntries })
+  let stored = original
+  installStorage(context, {
+    getItem: () => stored,
+    setItem: (storageKey, value) => {
+      assert.equal(storageKey, key)
+      stored = value
+    },
+  })
+
+  const loaded = loadMyDishes()
+  assert.equal(loaded.storageStatus, 'duplicate-names')
+  assert.deepEqual(loaded.personalRecipes, [example, duplicate])
+  assert.equal(saveMyDishes(loaded), 'duplicate-names')
+  assert.equal(stored, original)
+
+  const renamed = preparePersonalRecipe({ ...duplicate, name: 'Family Adobo' }, loaded.personalRecipes, duplicate.id)
+  assert.equal(renamed.recipe.id, duplicate.id)
+  assert.equal(saveMyDishes({ ...loaded, personalRecipes: [example, renamed.recipe] }), 'ready')
+  assert.deepEqual(JSON.parse(stored), { personalRecipes: [example, renamed.recipe], libraryEntries })
+})
+
+test('recovered duplicates stay protected after deletion until replacement is confirmed', (context) => {
+  const duplicate = { ...example, id: 'second', name: 'chicken   adobo' }
+  const original = JSON.stringify({ personalRecipes: [example, duplicate, null], libraryEntries })
+  let stored = original
+  installStorage(context, {
+    getItem: () => stored,
+    setItem: (storageKey, value) => {
+      assert.equal(storageKey, key)
+      stored = value
+    },
+  })
+
+  const recovered = loadMyDishes()
+  assert.equal(recovered.storageStatus, 'partial')
+  assert.deepEqual(recovered.personalRecipes, [example, duplicate])
+  assert.equal(hasDuplicateRecipeNames(recovered.personalRecipes), true)
+  const afterDelete = { ...recovered, personalRecipes: [example] }
+  assert.equal(saveMyDishes(afterDelete), 'partial')
+  assert.equal(stored, original)
+  assert.equal(saveMyDishes({ ...afterDelete, storageStatus: 'ready' }), 'ready')
+  assert.deepEqual(JSON.parse(stored), { personalRecipes: [example], libraryEntries })
+})
+
+test('an editor with a stale recipe reference cannot overwrite a saved ID after recovery', (context) => {
+  const reassignedId = webcrypto.randomUUID()
+  context.mock.method(globalThis.crypto, 'randomUUID', () => reassignedId)
+  const session = { ...example, name: 'Session Adobo' }
+  const draft = { ...session, name: 'Updated Session Adobo' }
+  const recovered = mergeRecoveredPersonalRecipes([example], [session])
+
+  assert.match(preparePersonalRecipe(draft, recovered, session.id, session).error, /no longer available/)
+  const remapped = recovered[1]
+  const edited = preparePersonalRecipe(draft, recovered, remapped.id, remapped).recipe
+  assert.equal(edited.id, reassignedId)
+  assert.equal(edited.name, draft.name)
+  assert.deepEqual(recovered[0], example)
 })

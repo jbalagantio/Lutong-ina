@@ -6,7 +6,13 @@ import MyDishes from './components/MyDishes.jsx'
 import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
 import recipes from './data/recipes.js'
-import { loadMyDishes, mergeRecoveredPersonalRecipes, preparePersonalRecipe, saveMyDishes } from './utils/myDishes.js'
+import {
+  hasDuplicateRecipeNames,
+  loadMyDishes,
+  mergeRecoveredPersonalRecipes,
+  preparePersonalRecipe,
+  saveMyDishes,
+} from './utils/myDishes.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -139,12 +145,15 @@ const App = () => {
 
   const saveAndCommitMyDishes = (nextDishes) => {
     const storageStatus = saveMyDishes(nextDishes)
-    commitMyDishes({ ...nextDishes, storageStatus })
+    const replacementError = storageStatus === 'ready' ? undefined : nextDishes.replacementError
+    commitMyDishes({ ...nextDishes, storageStatus, replacementError })
+    return storageStatus
   }
 
-  const handleSavePersonalRecipe = (values, editingId) => {
+  const handleSavePersonalRecipe = (values, editingRecipe) => {
     const current = latestDishes.current
-    const { recipe, error } = preparePersonalRecipe(values, current.personalRecipes, editingId)
+    const editingId = editingRecipe?.id
+    const { recipe, error } = preparePersonalRecipe(values, current.personalRecipes, editingId, editingRecipe)
     if (error) {
       return error
     }
@@ -156,17 +165,21 @@ const App = () => {
     return ''
   }
 
-  const handleDeletePersonalRecipe = (id) => {
+  const handleDeletePersonalRecipe = (recipe) => {
     const current = latestDishes.current
-    const personalRecipes = current.personalRecipes.filter((recipe) => recipe.id !== id)
+    if (!current.personalRecipes.includes(recipe)) {
+      return false
+    }
+    const personalRecipes = current.personalRecipes.filter((item) => item !== recipe)
     saveAndCommitMyDishes({ ...current, personalRecipes })
+    return true
   }
 
   const handleRetryDishes = () => {
     const current = latestDishes.current
     if (current.storageStatus !== 'read-failed') {
-      saveAndCommitMyDishes(current)
-      return
+      const status = saveAndCommitMyDishes(current)
+      return { status, remappedRecipes: new Map() }
     }
 
     const recovered = loadMyDishes()
@@ -175,25 +188,39 @@ const App = () => {
     }
     if (current.personalRecipes.length === 0) {
       commitMyDishes(recovered)
-      return
+      return { status: recovered.storageStatus, remappedRecipes: new Map() }
     }
 
     const personalRecipes = mergeRecoveredPersonalRecipes(recovered.personalRecipes, current.personalRecipes)
-    saveAndCommitMyDishes({ ...recovered, personalRecipes })
+    const remappedRecipes = new Map()
+    // Recovery appends session recipes in their original order after the saved recipes.
+    current.personalRecipes.forEach((recipe, index) => {
+      const mergedRecipe = personalRecipes[recovered.personalRecipes.length + index]
+      if (mergedRecipe.id !== recipe.id) {
+        remappedRecipes.set(recipe.id, mergedRecipe)
+      }
+    })
+    const status = saveAndCommitMyDishes({ ...recovered, personalRecipes })
+    return { status, remappedRecipes }
   }
 
   const handleReplaceSavedDishes = () => {
+    const current = latestDishes.current
+    const needsReplacement = current.storageStatus === 'invalid' || current.storageStatus === 'partial'
+    if (!needsReplacement || hasDuplicateRecipeNames(current.personalRecipes)) {
+      return false
+    }
     if (!window.confirm('Replace the saved My Dishes data with the recovered and current recipes? Unreadable entries will be lost.')) {
-      return
+      return false
     }
 
-    const current = latestDishes.current
     const storageStatus = saveMyDishes({ ...current, storageStatus: 'ready' })
     if (storageStatus === 'ready') {
       commitMyDishes({ ...current, storageStatus, replacementError: undefined })
     } else {
       commitMyDishes({ ...current, replacementError: storageStatus })
     }
+    return storageStatus === 'ready'
   }
 
   const handleNavigate = (screen) => {

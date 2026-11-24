@@ -16,6 +16,11 @@ export const recipeLimits = {
 
 export const normalizeRecipeName = (name) => name.trim().toLowerCase().replace(/\s+/g, ' ')
 
+export const hasDuplicateRecipeNames = (personalRecipes) => {
+  const names = new Set(personalRecipes.map((recipe) => normalizeRecipeName(recipe.name)))
+  return names.size < personalRecipes.length
+}
+
 const storageKey = 'lutong-ina-my-dishes'
 const builtInIds = new Set(recipes.map((recipe) => recipe.id))
 
@@ -101,7 +106,7 @@ const createPersonalRecipeId = (reservedIds) => {
   return id
 }
 
-export const preparePersonalRecipe = (values, personalRecipes, editingId) => {
+export const preparePersonalRecipe = (values, personalRecipes, editingId, expectedRecipe) => {
   const result = validatePersonalRecipe(values)
   if (result.error) {
     return result
@@ -115,7 +120,8 @@ export const preparePersonalRecipe = (values, personalRecipes, editingId) => {
 
   let id = editingId
   if (editingId) {
-    if (!personalRecipes.some((recipe) => recipe.id === editingId)) {
+    const currentRecipe = personalRecipes.find((recipe) => recipe.id === editingId)
+    if (!currentRecipe || (expectedRecipe && currentRecipe !== expectedRecipe)) {
       return { error: 'This recipe is no longer available.' }
     }
   } else {
@@ -185,7 +191,13 @@ export const loadMyDishes = () => {
 
   const libraryEntries = hasLibrary ? saved.libraryEntries : []
   const isPartial = !hasRecipes || !hasLibrary || personalRecipes.length !== savedRecipes.length
-  return { personalRecipes, libraryEntries, storageStatus: isPartial ? 'partial' : 'ready' }
+  let storageStatus = 'ready'
+  if (isPartial) {
+    storageStatus = 'partial'
+  } else if (hasDuplicateRecipeNames(personalRecipes)) {
+    storageStatus = 'duplicate-names'
+  }
+  return { personalRecipes, libraryEntries, storageStatus }
 }
 
 export const saveMyDishes = ({ personalRecipes, libraryEntries, storageStatus }) => {
@@ -193,8 +205,7 @@ export const saveMyDishes = ({ personalRecipes, libraryEntries, storageStatus })
     return storageStatus
   }
 
-  const names = new Set(personalRecipes.map((recipe) => normalizeRecipeName(recipe.name)))
-  if (names.size !== personalRecipes.length) {
+  if (hasDuplicateRecipeNames(personalRecipes)) {
     return 'duplicate-names'
   }
 
