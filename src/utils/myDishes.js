@@ -24,6 +24,90 @@ export const hasDuplicateRecipeNames = (personalRecipes) => {
 const storageKey = 'lutong-ina-my-dishes'
 const builtInIds = new Set(recipes.map((recipe) => recipe.id))
 
+export const saveBuiltInRecipe = (libraryEntries, recipeId) => {
+  if (!builtInIds.has(recipeId) || libraryEntries.some((entry) => entry.recipeId === recipeId)) {
+    return libraryEntries
+  }
+  return [...libraryEntries, { recipeId, isFavorite: false, isFamiliar: false }]
+}
+
+export const removeLibraryEntry = (libraryEntries, recipeId) =>
+  libraryEntries.filter((entry) => entry.recipeId !== recipeId)
+
+export const toggleRecipePreference = (libraryEntries, recipeId, preference) => {
+  if (preference !== 'isFavorite' && preference !== 'isFamiliar') {
+    return libraryEntries
+  }
+  const existing = libraryEntries.find((entry) => entry.recipeId === recipeId)
+  if (!existing) {
+    return [...libraryEntries, { recipeId, isFavorite: false, isFamiliar: false, [preference]: true }]
+  }
+  return libraryEntries.map((entry) =>
+    entry === existing ? { ...entry, [preference]: !entry[preference] } : entry,
+  )
+}
+
+export const getRecipeCollection = (personalRecipes, libraryEntries) => {
+  const entriesById = new Map(libraryEntries.map((entry) => [entry.recipeId, entry]))
+  const personalIds = new Set(personalRecipes.map((recipe) => recipe.id))
+  const savedRecipes = recipes.filter((recipe) => entriesById.has(recipe.id))
+  return [...personalRecipes, ...savedRecipes].map((recipe) => {
+    const entry = entriesById.get(recipe.id)
+    return {
+      recipe,
+      isPersonal: personalIds.has(recipe.id),
+      isFavorite: entry?.isFavorite ?? false,
+      isFamiliar: entry?.isFamiliar ?? false,
+    }
+  })
+}
+
+export const filterRecipeCollection = (collection, filter, searchTerm) => {
+  return collection.filter(({ recipe, isPersonal, isFavorite, isFamiliar }) => {
+    if (!normalizeRecipeName(recipe.name).includes(searchTerm)) {
+      return false
+    }
+    if (filter === 'favorites') return isFavorite
+    if (filter === 'familiar') return isFamiliar
+    if (filter === 'personal') return isPersonal
+    if (filter === 'saved') return !isPersonal
+    return true
+  })
+}
+
+export const deletePersonalRecipe = (dishes, recipe) => {
+  if (!dishes.personalRecipes.includes(recipe)) {
+    return dishes
+  }
+  return {
+    ...dishes,
+    personalRecipes: dishes.personalRecipes.filter((item) => item !== recipe),
+    libraryEntries: removeLibraryEntry(dishes.libraryEntries, recipe.id),
+  }
+}
+
+export const mergeLibraryEntries = (savedEntries, sessionEntries, remappedRecipes = new Map()) => {
+  const entriesById = new Map()
+  const remappedEntries = sessionEntries.map((entry) => {
+    const remapped = remappedRecipes.get(entry.recipeId)
+    return remapped ? { ...entry, recipeId: remapped.id } : entry
+  })
+  for (const entry of [...savedEntries, ...remappedEntries]) {
+    const existing = entriesById.get(entry.recipeId)
+    if (existing) {
+      // Retain enabled preferences from either copy after a storage outage.
+      entriesById.set(entry.recipeId, {
+        ...existing,
+        isFavorite: existing.isFavorite || entry.isFavorite,
+        isFamiliar: existing.isFamiliar || entry.isFamiliar,
+      })
+    } else {
+      entriesById.set(entry.recipeId, entry)
+    }
+  }
+  return [...entriesById.values()]
+}
+
 const textValue = (value) => typeof value === 'string' ? value.trim() : ''
 const numericValue = (value) => {
   if (typeof value === 'number') {
@@ -189,8 +273,14 @@ export const loadMyDishes = () => {
     personalRecipes.push(recipe)
   }
 
-  const libraryEntries = hasLibrary ? saved.libraryEntries : []
-  const isPartial = !hasRecipes || !hasLibrary || personalRecipes.length !== savedRecipes.length
+  const savedEntries = hasLibrary ? saved.libraryEntries : []
+  const validEntries = savedEntries.filter((entry) =>
+    typeof entry?.recipeId === 'string' && entry.recipeId.trim() && savedIds.has(entry.recipeId) &&
+    typeof entry.isFavorite === 'boolean' && typeof entry.isFamiliar === 'boolean',
+  )
+  const libraryEntries = mergeLibraryEntries(validEntries, [])
+  const isPartial = !hasRecipes || !hasLibrary || personalRecipes.length !== savedRecipes.length ||
+    libraryEntries.length !== savedEntries.length
   let storageStatus = 'ready'
   if (isPartial) {
     storageStatus = 'partial'

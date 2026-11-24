@@ -492,6 +492,7 @@ h1 {
 
 .dishes-warning,
 .dishes-empty,
+.dishes-filters,
 .recipe-form,
 .dishes-list {
   margin-top: 1rem;
@@ -606,6 +607,15 @@ h1 {
 .recipe-form button:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.dishes-filters {
+  max-width: 34rem;
+}
+
+.dish-preference[aria-pressed='true'] {
+  border-color: var(--orange);
+  color: var(--orange);
 }
 
 @media (min-width: 40rem) {

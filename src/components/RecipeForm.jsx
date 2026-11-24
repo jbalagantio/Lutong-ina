@@ -17,7 +17,7 @@ const createDraft = (recipe) => ({
   instructions: (recipe?.instructions ?? ['']).map((text, index) => ({ text, key: `step-${index}` })),
 })
 
-const RecipeForm = ({ recipe, onSave, onCancel }) => {
+const RecipeForm = ({ recipe, onSave, onCancel, onDraftChange }) => {
   const [draft, setDraft] = useState(() => createDraft(recipe))
   const [error, setError] = useState('')
   const nextRowId = useRef(0)
@@ -27,10 +27,12 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
   const addStepButton = useRef(null)
 
   const updateField = (field, value) => {
+    onDraftChange()
     setDraft((previous) => ({ ...previous, [field]: value }))
   }
 
   const updateRow = (list, key, field, value) => {
+    onDraftChange()
     setDraft((previous) => ({
       ...previous,
       [list]: previous[list].map((row) => row.key === key ? { ...row, [field]: value } : row),
@@ -38,6 +40,7 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
   }
 
   const addRow = (list, values) => {
+    onDraftChange()
     const key = `new-row-${nextRowId.current}`
     nextRowId.current += 1
     pendingFocus.current = { list, key }
@@ -50,6 +53,7 @@ const RecipeForm = ({ recipe, onSave, onCancel }) => {
   }
 
   const removeRow = (list, key, index) => {
+    onDraftChange()
     pendingFocus.current = { list, index }
     setDraft((previous) => ({
       ...previous,

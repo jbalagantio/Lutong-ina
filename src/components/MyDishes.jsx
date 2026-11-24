@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
-import { hasDuplicateRecipeNames, normalizeRecipeName } from '../utils/myDishes.js'
+import recipes from '../data/recipes.js'
+import { filterRecipeCollection, getRecipeCollection, hasDuplicateRecipeNames, normalizeRecipeName } from '../utils/myDishes.js'
+import LibraryRecipeRow from './LibraryRecipeRow.jsx'
 import RecipeForm from './RecipeForm.jsx'
 
 const storageWarnings = {
@@ -13,29 +15,48 @@ const storageWarnings = {
 
 const MyDishes = ({
   personalRecipes,
+  libraryEntries,
   storageStatus,
   replacementError,
   onSaveRecipe,
   onDeleteRecipe,
+  onBuiltInRecipe,
+  onRecipePreference,
   onRetryStorage,
   onReplaceStorage,
 }) => {
   const [editor, setEditor] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   const [search, setSearch] = useState('')
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [isBrowsing, setIsBrowsing] = useState(false)
   const addButton = useRef(null)
+  const filterSelect = useRef(null)
   const formTrigger = useRef(null)
   const nextEditorKey = useRef(0)
+  const draftChanged = useRef(false)
   const searchTerm = normalizeRecipeName(search)
-  const visibleRecipes = personalRecipes.filter((recipe) => normalizeRecipeName(recipe.name).includes(searchTerm))
+  const catalogTerm = normalizeRecipeName(catalogSearch)
+  const collection = getRecipeCollection(personalRecipes, libraryEntries)
+  const visibleRecipes = filterRecipeCollection(collection, filter, searchTerm)
+  const visibleCatalog = recipes.filter((recipe) => normalizeRecipeName(recipe.name).includes(catalogTerm))
+  const savedIds = new Set(libraryEntries.map((entry) => entry.recipeId))
   const warning = storageStatus === 'duplicate-names' ? '' : storageWarnings[storageStatus]
   const hasNameConflict = hasDuplicateRecipeNames(personalRecipes)
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
+
+  const canDiscardDraft = () => !draftChanged.current || window.confirm('Discard unsaved recipe changes?')
 
   const openEditor = (event, recipe) => {
     if (editor && editor.recipe === recipe) {
       return
     }
+    if (!canDiscardDraft()) {
+      return
+    }
+    draftChanged.current = false
+    setIsBrowsing(false)
     formTrigger.current = event.currentTarget
     const key = nextEditorKey.current
     nextEditorKey.current += 1
@@ -50,6 +71,18 @@ const MyDishes = ({
       addButton.current?.focus()
     }
     formTrigger.current = null
+    draftChanged.current = false
+  }
+
+  const handleToggleBrowse = () => {
+    if (!canDiscardDraft()) {
+      return
+    }
+    setEditor(null)
+    formTrigger.current = null
+    draftChanged.current = false
+    setExpandedId(null)
+    setIsBrowsing(!isBrowsing)
   }
 
   const handleSave = (values) => {
@@ -105,13 +138,34 @@ const MyDishes = ({
     }
   }
 
+  const handleBuiltInAction = (recipe, shouldSave) => {
+    onBuiltInRecipe(recipe.id, shouldSave)
+    if (!shouldSave && !isBrowsing) {
+      if (expandedId === recipe.id) setExpandedId(null)
+      filterSelect.current?.focus()
+    }
+  }
+
+  const handlePreference = (item, preference) => {
+    onRecipePreference(item.recipe, preference)
+    if ((filter === 'favorites' && preference === 'isFavorite' && item.isFavorite) ||
+        (filter === 'familiar' && preference === 'isFamiliar' && item.isFamiliar)) {
+      filterSelect.current?.focus()
+    }
+  }
+
   return (
     <section className="my-dishes" aria-labelledby="dishes-heading">
       <div className="dishes-header">
         <h1 id="dishes-heading">My Dishes</h1>
-        <button ref={addButton} type="button" className="pantry-button pantry-primary" onClick={openEditor}>
-          Add recipe
-        </button>
+        <div className="pantry-actions">
+          <button type="button" className="pantry-button" onClick={handleToggleBrowse}>
+            {isBrowsing ? 'Back to My Dishes' : 'Browse recipes'}
+          </button>
+          <button ref={addButton} type="button" className="pantry-button pantry-primary" onClick={openEditor}>
+            Add recipe
+          </button>
+        </div>
       </div>
       {(warning || hasNameConflict) && (
         <div className="storage-warning dishes-warning">
@@ -135,57 +189,75 @@ const MyDishes = ({
           recipe={editor.recipe}
           onSave={handleSave}
           onCancel={() => closeEditor()}
+          onDraftChange={() => { draftChanged.current = true }}
         />
       )}
-      <div className="search-field">
-        <label className="visually-hidden" htmlFor="personal-recipe-search">Search personal recipes</label>
-        <input id="personal-recipe-search" type="search" value={search} placeholder="Search personal recipes" onChange={(event) => setSearch(event.target.value)} />
+      <div className="pantry-fields dishes-filters">
+        <label>
+          <span className="visually-hidden">{isBrowsing ? 'Search catalog' : 'Search My Dishes'}</span>
+          <input id={isBrowsing ? 'catalog-recipe-search' : 'personal-recipe-search'} type="search" value={isBrowsing ? catalogSearch : search}
+            placeholder={isBrowsing ? 'Search catalog' : 'Search My Dishes'}
+            onChange={(event) => {
+              if (isBrowsing) setCatalogSearch(event.target.value)
+              else setSearch(event.target.value)
+            }}
+          />
+        </label>
+        {!isBrowsing && (
+          <label>
+            <span className="visually-hidden">Filter My Dishes</span>
+            <select ref={filterSelect} value={filter} onChange={(event) => setFilter(event.target.value)}>
+              <option value="all">All dishes</option>
+              <option value="favorites">Favorites</option>
+              <option value="familiar">Familiar</option>
+              <option value="personal">Personal recipes</option>
+              <option value="saved">Saved recipes</option>
+            </select>
+          </label>
+        )}
       </div>
-      {visibleRecipes.length === 0 && (
-        <p className="dishes-empty" role="status">{personalRecipes.length ? 'No matching recipes.' : 'No personal recipes yet.'}</p>
-      )}
-      {visibleRecipes.length > 0 && (
-        <ul className="dishes-list" aria-label="Personal recipes">
-          {visibleRecipes.map((recipe) => {
-            const isExpanded = recipe.id === expandedId
+      {isBrowsing && visibleCatalog.length === 0 && <p className="dishes-empty" role="status">No matching recipes.</p>}
+      {isBrowsing && visibleCatalog.length > 0 && (
+        <ul className="dishes-list" aria-label="Built-in recipes">
+          {visibleCatalog.map((recipe) => {
+            const isSaved = savedIds.has(recipe.id)
+            const action = isSaved ? 'Saved · Remove' : 'Save'
             return (
-              <li key={recipe.id} className="personal-recipe">
-                <div className="dishes-header">
-                  <div className="personal-recipe-summary">
-                    <h2>{recipe.name}</h2>
-                    <ul className="recipe-meta" aria-label="Recipe information">
-                      <li>{recipe.cookingTime} min</li>
-                      <li>{recipe.difficulty}</li>
-                      <li>{recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'}</li>
-                    </ul>
-                  </div>
-                  <div className="pantry-actions">
-                    <button className="pantry-button" type="button" aria-label={`${isExpanded ? 'Hide' : 'View'} ${recipe.name}`} aria-expanded={isExpanded} aria-controls={isExpanded ? 'personal-recipe-details' : undefined} onClick={() => setExpandedId(isExpanded ? null : recipe.id)}>
-                      {isExpanded ? 'Hide' : 'View'}
-                    </button>
-                    <button className="pantry-button" type="button" aria-label={`Edit ${recipe.name}`} onClick={(event) => openEditor(event, recipe)}>Edit</button>
-                    <button className="pantry-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => handleDelete(recipe)}>Delete</button>
-                  </div>
-                </div>
-                {isExpanded && (
-                  <div className="personal-recipe-details" id="personal-recipe-details">
-                    <p className="recipe-cuisine">{recipe.cuisine}</p>
-                    {recipe.description && <p>{recipe.description}</p>}
-                    <h3>Ingredients</h3>
-                    <ul>
-                      {recipe.ingredients.map((ingredient, index) => (
-                        <li key={index}>{ingredient.quantity} {ingredient.unit} {ingredient.name}</li>
-                      ))}
-                    </ul>
-                    <h3>Instructions</h3>
-                    <ol>
-                      {recipe.instructions.map((step, index) => <li key={index}>{step}</li>)}
-                    </ol>
-                  </div>
-                )}
-              </li>
+              <LibraryRecipeRow key={recipe.id} recipe={recipe} isExpanded={expandedId === recipe.id}
+                onToggleDetails={() => setExpandedId(expandedId === recipe.id ? null : recipe.id)}>
+                <button className="pantry-button" type="button" aria-label={`${action} ${recipe.name}`}
+                  onClick={() => handleBuiltInAction(recipe, !isSaved)}>{action}</button>
+              </LibraryRecipeRow>
             )
           })}
+        </ul>
+      )}
+      {!isBrowsing && visibleRecipes.length === 0 && (
+        <p className="dishes-empty" role="status">{collection.length ? 'No matching recipes.' : 'No recipes in My Dishes yet.'}</p>
+      )}
+      {!isBrowsing && visibleRecipes.length > 0 && (
+        <ul className="dishes-list" aria-label="My Dishes recipes">
+          {visibleRecipes.map((item) => (
+            <LibraryRecipeRow key={item.recipe.id} recipe={item.recipe} isExpanded={expandedId === item.recipe.id}
+              onToggleDetails={() => setExpandedId(expandedId === item.recipe.id ? null : item.recipe.id)}>
+              <button className="icon-button dish-preference" type="button" aria-label={`Favorite ${item.recipe.name}`}
+                aria-pressed={item.isFavorite} title="Favorite" onClick={() => handlePreference(item, 'isFavorite')}>
+                <svg viewBox="0 0 24 24" fill={item.isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20 4 12a5 5 0 0 1 8-6 5 5 0 0 1 8 6z" />
+                </svg>
+              </button>
+              <button className="pantry-button dish-preference" type="button" aria-label={`Familiar: ${item.recipe.name}`}
+                aria-pressed={item.isFamiliar} onClick={() => handlePreference(item, 'isFamiliar')}>Familiar</button>
+              {item.isPersonal ? (
+                <>
+                  <button className="pantry-button" type="button" aria-label={`Edit ${item.recipe.name}`} onClick={(event) => openEditor(event, item.recipe)}>Edit</button>
+                  <button className="pantry-button" type="button" aria-label={`Delete ${item.recipe.name}`} onClick={() => handleDelete(item.recipe)}>Delete</button>
+                </>
+              ) : (
+                <button className="pantry-button" type="button" aria-label={`Remove saved ${item.recipe.name}`} onClick={() => handleBuiltInAction(item.recipe, false)}>Remove saved</button>
+              )}
+            </LibraryRecipeRow>
+          ))}
         </ul>
       )}
     </section>

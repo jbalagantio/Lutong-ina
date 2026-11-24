@@ -3,11 +3,18 @@ import { webcrypto } from 'node:crypto'
 import { test } from 'node:test'
 import builtInRecipes from '../src/data/recipes.js'
 import {
+  deletePersonalRecipe,
+  filterRecipeCollection,
+  getRecipeCollection,
   hasDuplicateRecipeNames,
   loadMyDishes,
+  mergeLibraryEntries,
   mergeRecoveredPersonalRecipes,
   preparePersonalRecipe,
+  removeLibraryEntry,
+  saveBuiltInRecipe,
   saveMyDishes,
+  toggleRecipePreference,
   validatePersonalRecipe,
 } from '../src/utils/myDishes.js'
 
@@ -23,7 +30,7 @@ const example = {
   ingredients: [{ name: 'Soy sauce', quantity: 0.5, unit: 'cup' }],
   instructions: ['Simmer until done.'],
 }
-const libraryEntries = [{ recipeId: 'chicken-adobo', metadata: { saved: true } }]
+const libraryEntries = [{ recipeId: 'chicken-adobo', isFavorite: true, isFamiliar: false }]
 
 const installStorage = (context, storage) => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
@@ -241,4 +248,92 @@ test('an editor with a stale recipe reference cannot overwrite a saved ID after 
   assert.equal(edited.id, reassignedId)
   assert.equal(edited.name, draft.name)
   assert.deepEqual(recovered[0], example)
+})
+
+test('saves catalog recipes by ID once and removes only their library metadata', () => {
+  const originalCatalog = structuredClone(builtInRecipes)
+  const entries = saveBuiltInRecipe([], 'chicken-adobo')
+  assert.deepEqual(entries, [{ recipeId: 'chicken-adobo', isFavorite: false, isFamiliar: false }])
+  assert.equal(saveBuiltInRecipe(entries, 'chicken-adobo'), entries)
+  assert.equal(saveBuiltInRecipe(entries, example.id), entries)
+  assert.deepEqual(removeLibraryEntry(toggleRecipePreference(entries, 'chicken-adobo', 'isFavorite'), 'chicken-adobo'), [])
+  assert.deepEqual(builtInRecipes, originalCatalog)
+})
+
+test('personal recipes default to unmarked and both preferences toggle independently', () => {
+  const unmarked = getRecipeCollection([example], [])
+  assert.deepEqual(unmarked, [{ recipe: example, isPersonal: true, isFavorite: false, isFamiliar: false }])
+  const favorites = toggleRecipePreference([], example.id, 'isFavorite')
+  const familiar = toggleRecipePreference(favorites, example.id, 'isFamiliar')
+  assert.deepEqual(favorites, [{ recipeId: example.id, isFavorite: true, isFamiliar: false }])
+  assert.deepEqual(familiar, [{ recipeId: example.id, isFavorite: true, isFamiliar: true }])
+  assert.deepEqual(toggleRecipePreference(familiar, example.id, 'isFavorite'), [
+    { recipeId: example.id, isFavorite: false, isFamiliar: true },
+  ])
+  assert.deepEqual(toggleRecipePreference(familiar, example.id, 'isFamiliar'), favorites)
+})
+
+test('derives both recipe sources and combines name search with every collection filter', () => {
+  const entries = [
+    ...libraryEntries,
+    { recipeId: 'pork-adobo', isFavorite: false, isFamiliar: true },
+    { recipeId: example.id, isFavorite: false, isFamiliar: true },
+  ]
+  const collection = getRecipeCollection([example], entries)
+  const ids = (filter, query) => filterRecipeCollection(collection, filter, query).map(({ recipe }) => recipe.id)
+  assert.deepEqual(ids('all', 'adobo'), [example.id, 'chicken-adobo', 'pork-adobo'])
+  assert.deepEqual(ids('favorites', 'adobo'), ['chicken-adobo'])
+  assert.deepEqual(ids('familiar', 'pork'), ['pork-adobo'])
+  assert.deepEqual(ids('personal', 'chicken ad'), [example.id])
+  assert.deepEqual(ids('saved', 'chicken'), ['chicken-adobo'])
+  assert.deepEqual(ids('favorites', 'pork'), [])
+  assert.equal(collection[1].recipe, builtInRecipes[0])
+})
+
+test('personal deletion cleans up metadata and guards against stale and built-in records', () => {
+  const personalEntry = { recipeId: example.id, isFavorite: true, isFamiliar: true }
+  const dishes = { personalRecipes: [example], libraryEntries: [...libraryEntries, personalEntry] }
+  assert.equal(deletePersonalRecipe(dishes, { ...example }), dishes)
+  assert.equal(deletePersonalRecipe(dishes, builtInRecipes[0]), dishes)
+  assert.deepEqual(deletePersonalRecipe(dishes, example), { personalRecipes: [], libraryEntries })
+  assert.equal(dishes.libraryEntries.length, 2)
+})
+
+test('recovers valid preferences, preserves recipes, and protects storage with malformed library entries', (context) => {
+  const personalEntry = { recipeId: example.id, isFavorite: false, isFamiliar: true }
+  const invalidEntries = [
+    null, { recipeId: '' }, { recipeId: ' ' }, { recipeId: 'missing', isFavorite: true, isFamiliar: true },
+    { recipeId: example.id, isFavorite: true }, { ...personalEntry, isFamiliar: 'true' },
+    { ...libraryEntries[0], isFavorite: false, isFamiliar: true },
+  ]
+  const raw = JSON.stringify({ personalRecipes: [example], libraryEntries: [...libraryEntries, personalEntry, ...invalidEntries] })
+  const setItem = context.mock.fn()
+  installStorage(context, { getItem: () => raw, setItem })
+  const recovered = loadMyDishes()
+  assert.deepEqual(recovered, {
+    personalRecipes: [example],
+    libraryEntries: [{ ...libraryEntries[0], isFamiliar: true }, personalEntry],
+    storageStatus: 'partial',
+  })
+  assert.equal(saveMyDishes(recovered), 'partial')
+  assert.equal(setItem.mock.callCount(), 0)
+})
+
+test('recovery keeps saved and remapped personal metadata separate and combines built-in flags', (context) => {
+  const replacementId = webcrypto.randomUUID()
+  context.mock.method(globalThis.crypto, 'randomUUID', () => replacementId)
+  const sessionRecipe = { ...example, name: 'Session Adobo' }
+  const personalRecipes = mergeRecoveredPersonalRecipes([example], [sessionRecipe])
+  const saved = [...libraryEntries, { recipeId: example.id, isFavorite: false, isFamiliar: true }]
+  const session = [
+    { recipeId: 'chicken-adobo', isFavorite: false, isFamiliar: true },
+    { recipeId: example.id, isFavorite: true, isFamiliar: false },
+  ]
+  const remapped = new Map([[example.id, personalRecipes[1]]])
+  assert.deepEqual(mergeLibraryEntries(saved, session, remapped), [
+    { recipeId: 'chicken-adobo', isFavorite: true, isFamiliar: true },
+    saved[1],
+    { recipeId: replacementId, isFavorite: true, isFamiliar: false },
+  ])
+  assert.equal(session[1].recipeId, example.id)
 })

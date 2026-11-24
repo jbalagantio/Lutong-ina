@@ -7,11 +7,16 @@ import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
 import recipes from './data/recipes.js'
 import {
+  deletePersonalRecipe,
   hasDuplicateRecipeNames,
   loadMyDishes,
+  mergeLibraryEntries,
   mergeRecoveredPersonalRecipes,
   preparePersonalRecipe,
+  removeLibraryEntry,
+  saveBuiltInRecipe,
   saveMyDishes,
+  toggleRecipePreference,
 } from './utils/myDishes.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
@@ -167,12 +172,38 @@ const App = () => {
 
   const handleDeletePersonalRecipe = (recipe) => {
     const current = latestDishes.current
-    if (!current.personalRecipes.includes(recipe)) {
+    const next = deletePersonalRecipe(current, recipe)
+    if (next === current) {
       return false
     }
-    const personalRecipes = current.personalRecipes.filter((item) => item !== recipe)
-    saveAndCommitMyDishes({ ...current, personalRecipes })
+    saveAndCommitMyDishes(next)
     return true
+  }
+
+  const handleBuiltInRecipe = (recipeId, shouldSave) => {
+    const current = latestDishes.current
+    if (!recipes.some((recipe) => recipe.id === recipeId)) {
+      return
+    }
+    const isSaved = current.libraryEntries.some((entry) => entry.recipeId === recipeId)
+    if (isSaved === shouldSave) {
+      return
+    }
+    const libraryEntries = shouldSave
+      ? saveBuiltInRecipe(current.libraryEntries, recipeId)
+      : removeLibraryEntry(current.libraryEntries, recipeId)
+    saveAndCommitMyDishes({ ...current, libraryEntries })
+  }
+
+  const handleRecipePreference = (recipe, preference) => {
+    const current = latestDishes.current
+    const isSavedBuiltIn = recipes.includes(recipe) &&
+      current.libraryEntries.some((entry) => entry.recipeId === recipe.id)
+    if (!current.personalRecipes.includes(recipe) && !isSavedBuiltIn) {
+      return
+    }
+    const libraryEntries = toggleRecipePreference(current.libraryEntries, recipe.id, preference)
+    saveAndCommitMyDishes({ ...current, libraryEntries })
   }
 
   const handleRetryDishes = () => {
@@ -186,7 +217,7 @@ const App = () => {
     if (recovered.storageStatus === 'read-failed') {
       return
     }
-    if (current.personalRecipes.length === 0) {
+    if (current.personalRecipes.length === 0 && current.libraryEntries.length === 0) {
       commitMyDishes(recovered)
       return { status: recovered.storageStatus, remappedRecipes: new Map() }
     }
@@ -200,7 +231,8 @@ const App = () => {
         remappedRecipes.set(recipe.id, mergedRecipe)
       }
     })
-    const status = saveAndCommitMyDishes({ ...recovered, personalRecipes })
+    const libraryEntries = mergeLibraryEntries(recovered.libraryEntries, current.libraryEntries, remappedRecipes)
+    const status = saveAndCommitMyDishes({ ...recovered, personalRecipes, libraryEntries })
     return { status, remappedRecipes }
   }
 
@@ -250,10 +282,13 @@ const App = () => {
     screen = (
       <MyDishes
         personalRecipes={myDishes.personalRecipes}
+        libraryEntries={myDishes.libraryEntries}
         storageStatus={myDishes.storageStatus}
         replacementError={myDishes.replacementError}
         onSaveRecipe={handleSavePersonalRecipe}
         onDeleteRecipe={handleDeletePersonalRecipe}
+        onBuiltInRecipe={handleBuiltInRecipe}
+        onRecipePreference={handleRecipePreference}
         onRetryStorage={handleRetryDishes}
         onReplaceStorage={handleReplaceSavedDishes}
       />
