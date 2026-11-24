@@ -1,5 +1,5 @@
 import { recipeDifficulties } from './myDishes.js'
-import { matchesIngredientSearch, normalizeIngredientName } from './pantry.js'
+import { getIngredientMatchName, matchesIngredientSearch, normalizeIngredientName } from './pantry.js'
 
 export const getDiscoverFilterOptions = (recipes) => {
   const cuisines = [...new Set(recipes.map((recipe) => recipe.cuisine))]
@@ -22,4 +22,19 @@ export const filterDiscoverRecipes = (recipes, { query = '', cuisine = '', maxTi
       normalizeIngredientName(recipe.name).includes(searchTerm) ||
       recipe.ingredients.some((ingredient) => matchesIngredientSearch(ingredient.name, searchTerm))
   }).sort((first, second) => first.name.localeCompare(second.name, 'en'))
+}
+
+export const getRecipeIngredientStatuses = ({ recipe, matchedIngredients, missingIngredients }) => {
+  const statuses = new Map()
+  for (const ingredient of matchedIngredients) {
+    statuses.set(getIngredientMatchName(ingredient.name), 'Available')
+  }
+  for (const ingredient of missingIngredients) {
+    statuses.set(getIngredientMatchName(ingredient.name), 'Missing')
+  }
+
+  // The shared matcher omits water. Repeated rows use the status of their canonical ingredient.
+  return recipe.ingredients.map((ingredient) =>
+    statuses.get(getIngredientMatchName(ingredient.name)) ?? 'Not tracked',
+  )
 }

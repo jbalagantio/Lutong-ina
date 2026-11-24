@@ -851,6 +851,20 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.ingredient-coverage {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.ingredient-coverage progress {
+  display: block;
+  width: 100%;
+  height: 0.4rem;
+  accent-color: var(--green);
+}
+
 .discover-recipe .recipe-photo-credit {
   margin-top: 0;
 }
@@ -931,12 +945,38 @@ h1 {
 .recipe-detail-ingredients li {
   display: grid;
   grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr);
-  gap: 0.65rem;
+  gap: 0.15rem 0.65rem;
 }
 
 .recipe-detail-ingredients li > span:first-child {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.recipe-detail-availability-note {
+  margin-block: 0.5rem 1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.ingredient-status {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.ingredient-status[data-status='Available'] {
+  color: var(--green);
+}
+
+@media (min-width: 64rem) {
+  .recipe-detail-ingredients li {
+    grid-template-columns: minmax(0, 5.25rem) minmax(0, 1fr) auto;
+  }
+
+  .ingredient-status {
+    grid-column: auto;
+  }
 }
 
 .recipe-detail-instructions {

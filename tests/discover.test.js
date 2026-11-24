@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import recipes from '../src/data/recipes.js'
-import { filterDiscoverRecipes, getDiscoverFilterOptions } from '../src/utils/discover.js'
+import { getRecipeMatches } from '../src/utils/recommendations.js'
+import { filterDiscoverRecipes, getDiscoverFilterOptions, getRecipeIngredientStatuses } from '../src/utils/discover.js'
 
 const names = (results) => results.map((recipe) => recipe.name)
 
@@ -86,4 +87,45 @@ test('options derive from the full catalog without duplicate or unsupported valu
     cuisines: ['Filipino', 'Vietnamese'],
     difficulties: ['Easy', 'Hard'],
   })
+})
+
+test('ingredient rows agree with canonical coverage for aliases, duplicates, and unknown ingredients', () => {
+  const ingredients = Object.freeze(['Chicken', 'Manok', 'Toyo', 'Water', 'Tubig', 'Local herb'].map((name) =>
+    Object.freeze({ name, quantity: 0.33, unit: 'cup' }),
+  ))
+  const recipe = Object.freeze({ ingredients })
+  const pantry = Object.freeze([
+    Object.freeze({ name: 'Chicken', isAvailable: false }),
+    Object.freeze({ name: 'Manok', isAvailable: true }),
+    Object.freeze({ name: 'Soy sauce', isAvailable: false }),
+    Object.freeze({ name: ' local   HERB ', isAvailable: true }),
+  ])
+  const [match] = getRecipeMatches([recipe], pantry)
+  assert.equal(match.matchedCount, 2)
+  assert.equal(match.trackedCount, 3)
+  assert.equal(match.missingIngredients.length, 1)
+  assert.deepEqual(getRecipeIngredientStatuses(match), [
+    'Available', 'Available', 'Missing', 'Not tracked', 'Not tracked', 'Available',
+  ])
+  assert.equal(match.recipe, recipe)
+  assert.equal(recipe.ingredients[0].quantity, 0.33)
+})
+
+test('an empty pantry and a fully stocked pantry give consistent row statuses', () => {
+  const recipe = { ingredients: [{ name: 'Eggplant' }, { name: 'Tubig' }, { name: 'Garlic' }] }
+  const [empty] = getRecipeMatches([recipe], [])
+  assert.equal(empty.matchPercentage, 0)
+  assert.deepEqual(getRecipeIngredientStatuses(empty), ['Missing', 'Not tracked', 'Missing'])
+
+  const [full] = getRecipeMatches([recipe], [{ name: 'Talong', isAvailable: true }, { name: 'Bawang', isAvailable: true }])
+  assert.equal(full.matchPercentage, 100)
+  assert.deepEqual(getRecipeIngredientStatuses(full), ['Available', 'Not tracked', 'Available'])
+})
+
+test('water-only recipes have no tracked rows even when water is in the pantry', () => {
+  const recipe = { ingredients: [{ name: 'Water' }, { name: ' TUBIG ' }] }
+  const [match] = getRecipeMatches([recipe], [{ name: 'Tubig', isAvailable: true }])
+  assert.equal(match.trackedCount, 0)
+  assert.equal(match.matchPercentage, 0)
+  assert.deepEqual(getRecipeIngredientStatuses(match), ['Not tracked', 'Not tracked'])
 })

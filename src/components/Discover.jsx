@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import recipes from '../data/recipes.js'
 import { filterDiscoverRecipes, getDiscoverFilterOptions } from '../utils/discover.js'
+import { getRecipeMatches } from '../utils/recommendations.js'
 import DiscoverRecipeCard from './DiscoverRecipeCard.jsx'
 import RecipeDetails from './RecipeDetails.jsx'
 
@@ -8,7 +9,7 @@ const { cuisines, difficulties } = getDiscoverFilterOptions(recipes)
 const cookingTimeLimits = [30, 60, 90]
 const defaultFilters = { query: '', cuisine: '', maxTime: '', difficulty: '' }
 
-const Discover = () => {
+const Discover = ({ pantryIngredients }) => {
   const [filters, setFilters] = useState(defaultFilters)
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const searchInput = useRef(null)
@@ -16,6 +17,8 @@ const Discover = () => {
   const catalogReturn = useRef(null)
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId)
   const results = filterDiscoverRecipes(recipes, filters)
+  const displayedRecipes = selectedRecipe ? [selectedRecipe] : results
+  const matches = getRecipeMatches(displayedRecipes, pantryIngredients)
   const hasActiveFilters = filters.query.trim() || filters.cuisine || filters.maxTime || filters.difficulty
 
   useLayoutEffect(() => {
@@ -61,7 +64,7 @@ const Discover = () => {
         <button className="pantry-button discover-back" type="button" onClick={() => setSelectedRecipeId(null)}>
           Back to Discover
         </button>
-        <RecipeDetails recipe={selectedRecipe} headingRef={detailHeading} />
+        <RecipeDetails recipe={selectedRecipe} match={matches[0]} headingRef={detailHeading} />
       </div>
     )
   }
@@ -112,8 +115,8 @@ const Discover = () => {
       </div>
       {results.length > 0 ? (
         <ul className="discover-grid" role="list">
-          {results.map((recipe) => (
-            <li key={recipe.id}><DiscoverRecipeCard recipe={recipe} onOpen={openRecipe} /></li>
+          {matches.map((match) => (
+            <li key={match.recipe.id}><DiscoverRecipeCard match={match} onOpen={openRecipe} /></li>
           ))}
         </ul>
       ) : (

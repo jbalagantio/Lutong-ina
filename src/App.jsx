@@ -424,7 +424,7 @@ const App = ({ canReconcilePhotos }) => {
       />
     )
   } else if (activeScreen === 'discover') {
-    screen = <Discover />
+    screen = <Discover pantryIngredients={pantry.ingredients} />
   } else {
     const { mode, rounds } = recommendationSession
     const matches = mode ? getDishesMatches(pantry.ingredients, myDishes) : []

@@ -35,6 +35,8 @@ Pantry search accepts partial names in both English and Filipino when an explici
 
 **Discover** shows the built-in recipe catalog in alphabetical order, with photographs, cooking times, and difficulty. The catalog includes saved and familiar built-in dishes. Search by recipe name or ingredient, including English and Filipino ingredient aliases. Combine cuisine, maximum cooking time, and difficulty filters, or clear them to restore the catalog. Discover filters are session-local and reset when the screen is unmounted. Select a recipe photo or title to view its complete ingredients, quantities, and instructions. Back to Discover keeps the search and filters intact and returns focus to the selected recipe.
 
+Discover cards show how many tracked ingredients are available. Recipe details also show coverage and label each ingredient Available, Missing, or Not tracked. Matching checks pantry presence and in-stock status regardless of quantity. English and Filipino aliases share a match, equivalent ingredients count once toward coverage, and water and its aliases are untracked.
+
 Run `node --test` to verify recipe and photo utilities, ingredient matching, pantry utilities, and recommendation rules.
 
 If browser storage is unavailable, you can keep editing the pantry in memory and retry loading or saving. A successful load retry keeps saved entries alongside ingredients added during the outage. If saved data is unreadable or only partly recoverable, it is kept as-is until you confirm **Replace saved pantry**. Unsaved changes can be lost on refresh.
