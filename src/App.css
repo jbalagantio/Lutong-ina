@@ -871,11 +871,16 @@ h1 {
 
 .discover-recipe-opening {
   position: relative;
+  isolation: isolate;
   display: grid;
   gap: 0.55rem;
 }
 
 .discover-recipe h2 {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding-inline-end: 3.25rem;
   font-size: clamp(1.35rem, 2.2vw, 1.65rem);
 }
 
@@ -895,7 +900,14 @@ h1 {
   content: '';
 }
 
-.discover-recipe-opening:hover .discover-recipe-open {
+.discover-bookmark {
+  position: absolute;
+  inset: auto 0 0 auto;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.discover-recipe-open:hover {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }

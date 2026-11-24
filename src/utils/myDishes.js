@@ -1,5 +1,14 @@
 import recipes from '../data/recipes.js'
 
+export const myDishesStorageWarnings = {
+  'read-failed': 'Could not open My Dishes. Changes stay in memory until saved.',
+  invalid: 'Saved My Dishes data is unreadable. Changes stay in memory until you confirm replacement.',
+  partial: 'Only some saved data could be recovered. Changes stay in memory until you confirm replacement.',
+  'write-failed': 'Could not save My Dishes. Changes stay in memory.',
+  'quota-exceeded': 'Browser storage is full. Changes stay in memory.',
+  'duplicate-names': 'Some recipes share a name. Rename or delete the duplicates before saving.',
+}
+
 export const recipeDifficulties = ['Easy', 'Medium', 'Hard']
 export const recipeLimits = {
   name: 100,

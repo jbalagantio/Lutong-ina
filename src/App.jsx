@@ -405,6 +405,7 @@ const App = ({ canReconcilePhotos }) => {
         onRetryPhotoCleanup={myDishes.storageStatus === 'ready'
           ? cleanUpPhotos
           : undefined}
+        onBrowseRecipes={(event) => handleNavigate('discover', event.currentTarget)}
         onSaveRecipe={handleSavePersonalRecipe}
         onDeleteRecipe={handleDeletePersonalRecipe}
         onBuiltInRecipe={handleBuiltInRecipe}
@@ -424,7 +425,15 @@ const App = ({ canReconcilePhotos }) => {
       />
     )
   } else if (activeScreen === 'discover') {
-    screen = <Discover pantryIngredients={pantry.ingredients} />
+    screen = (
+      <Discover
+        pantryIngredients={pantry.ingredients}
+        libraryEntries={myDishes.libraryEntries}
+        libraryStorageStatus={myDishes.storageStatus}
+        onBuiltInRecipe={handleBuiltInRecipe}
+        onRecipePreference={handleRecipePreference}
+      />
+    )
   } else {
     const { mode, rounds } = recommendationSession
     const matches = mode ? getDishesMatches(pantry.ingredients, myDishes) : []

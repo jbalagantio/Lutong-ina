@@ -1,8 +1,9 @@
 import { getRecipeIngredientStatuses } from '../utils/discover.js'
 import IngredientCoverage from './IngredientCoverage.jsx'
 import RecipeImage from './RecipeImage.jsx'
+import RecipePreferences from './RecipePreferences.jsx'
 
-const RecipeDetails = ({ recipe, match, headingRef }) => {
+const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved, onTogglePreference }) => {
   const ingredientStatuses = getRecipeIngredientStatuses(match)
 
   return (
@@ -17,6 +18,17 @@ const RecipeDetails = ({ recipe, match, headingRef }) => {
             <li>{recipe.servings} {recipe.servings === 1 ? 'serving' : 'servings'}</li>
           </ul>
           {recipe.description && <p>{recipe.description}</p>}
+          {onToggleSaved && (
+            <div className="pantry-actions">
+              <button className="pantry-button" type="button" onClick={onToggleSaved}>
+                {libraryEntry ? 'Remove saved' : 'Save to My Dishes'}
+              </button>
+              {libraryEntry && (
+                <RecipePreferences recipeName={recipe.name} isFavorite={libraryEntry.isFavorite} isFamiliar={libraryEntry.isFamiliar}
+                  onTogglePreference={onTogglePreference} />
+              )}
+            </div>
+          )}
         </header>
         <RecipeImage recipe={recipe} eager showCredit />
       </div>

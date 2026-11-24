@@ -15,7 +15,7 @@ Run `npm run lint` to check the source and `npm run build` to create the product
 
 ## Current features
 
-Use **My Dishes** to create, search, expand, edit, and delete personal recipes. **Browse recipes** lets you save dishes from the built-in catalog. The collection combines both sources and supports name search and filters. Favorite and Familiar are independent choices and start off for every recipe.
+Use **My Dishes** to create, search, expand, edit, and delete personal recipes. **Browse recipes** opens Discover, the built-in catalog. The collection combines both sources and supports name search and filters. Favorite and Familiar are independent choices and start off for every recipe.
 
 My Dishes uses separate browser storage from Pantry. Library entries store recipe IDs and preferences. Removing a saved recipe or deleting a personal one removes its preferences. After a storage read failure, explicit session changes take precedence, including turning off a preference or removing a recipe. Untouched preferences are recovered from storage. Removing and saving the same recipe again starts its preferences fresh. If a personal recipe ID is reassigned, its session preferences follow the new ID. Duplicate entries already in storage retain enabled flags from either copy and require replacement confirmation along with other partially recovered data.
 
@@ -34,6 +34,8 @@ Home recommendations include all built-in and personal recipes. Matches use avai
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
 
 **Discover** shows the built-in recipe catalog in alphabetical order, with photographs, cooking times, and difficulty. The catalog includes saved and familiar built-in dishes. Search by recipe name or ingredient, including English and Filipino ingredient aliases. Combine cuisine, maximum cooking time, and difficulty filters, or clear them to restore the catalog. Discover filters are session-local and reset when the screen is unmounted. Select a recipe photo or title to view its complete ingredients, quantities, and instructions. Back to Discover keeps the search and filters intact and returns focus to the selected recipe.
+
+Save or remove built-in recipes from the Discover bookmark or recipe detail actions. Discover and My Dishes share the same library. Saving starts with Favorite and Familiar off, and both preferences can be changed independently from a saved recipe's detail view or My Dishes. Successful writes persist in browser storage. During storage failures, changes stay in memory and the My Dishes recovery actions remain available.
 
 Discover cards show how many tracked ingredients are available. Recipe details also show coverage and label each ingredient Available, Missing, or Not tracked. Matching checks pantry presence and in-stock status regardless of quantity. English and Filipino aliases share a match, equivalent ingredients count once toward coverage, and water and its aliases are untracked.
 

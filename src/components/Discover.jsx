@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import recipes from '../data/recipes.js'
 import { filterDiscoverRecipes, getDiscoverFilterOptions } from '../utils/discover.js'
+import { myDishesStorageWarnings } from '../utils/myDishes.js'
 import { getRecipeMatches } from '../utils/recommendations.js'
 import DiscoverRecipeCard from './DiscoverRecipeCard.jsx'
 import RecipeDetails from './RecipeDetails.jsx'
@@ -9,7 +10,7 @@ const { cuisines, difficulties } = getDiscoverFilterOptions(recipes)
 const cookingTimeLimits = [30, 60, 90]
 const defaultFilters = { query: '', cuisine: '', maxTime: '', difficulty: '' }
 
-const Discover = ({ pantryIngredients }) => {
+const Discover = ({ pantryIngredients, libraryEntries, libraryStorageStatus, onBuiltInRecipe, onRecipePreference }) => {
   const [filters, setFilters] = useState(defaultFilters)
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const searchInput = useRef(null)
@@ -19,6 +20,13 @@ const Discover = ({ pantryIngredients }) => {
   const results = filterDiscoverRecipes(recipes, filters)
   const displayedRecipes = selectedRecipe ? [selectedRecipe] : results
   const matches = getRecipeMatches(displayedRecipes, pantryIngredients)
+  const libraryByRecipeId = new Map(libraryEntries.map((entry) => [entry.recipeId, entry]))
+  const storageWarning = myDishesStorageWarnings[libraryStorageStatus]
+  const libraryWarning = storageWarning && (
+    <div className="storage-warning dishes-warning">
+      <p role="alert">{storageWarning}</p>
+    </div>
+  )
   const hasActiveFilters = filters.query.trim() || filters.cuisine || filters.maxTime || filters.difficulty
 
   useLayoutEffect(() => {
@@ -64,7 +72,15 @@ const Discover = ({ pantryIngredients }) => {
         <button className="pantry-button discover-back" type="button" onClick={() => setSelectedRecipeId(null)}>
           Back to Discover
         </button>
-        <RecipeDetails recipe={selectedRecipe} match={matches[0]} headingRef={detailHeading} />
+        {libraryWarning}
+        <RecipeDetails
+          recipe={selectedRecipe}
+          match={matches[0]}
+          headingRef={detailHeading}
+          libraryEntry={libraryByRecipeId.get(selectedRecipeId)}
+          onToggleSaved={() => onBuiltInRecipe(selectedRecipeId, !libraryByRecipeId.has(selectedRecipeId))}
+          onTogglePreference={(preference) => onRecipePreference(selectedRecipe, preference)}
+        />
       </div>
     )
   }
@@ -72,6 +88,7 @@ const Discover = ({ pantryIngredients }) => {
   return (
     <section className="discover" aria-labelledby="discover-heading">
       <h1 id="discover-heading" lang="fil" tabIndex={-1}>Ma, <em>anong ulam?</em></h1>
+      {libraryWarning}
       <div className="discover-controls">
         <div className="discover-search">
           <label className="visually-hidden" htmlFor="discover-search">Search dishes or ingredients</label>
@@ -116,7 +133,14 @@ const Discover = ({ pantryIngredients }) => {
       {results.length > 0 ? (
         <ul className="discover-grid" role="list">
           {matches.map((match) => (
-            <li key={match.recipe.id}><DiscoverRecipeCard match={match} onOpen={openRecipe} /></li>
+            <li key={match.recipe.id}>
+              <DiscoverRecipeCard
+                match={match}
+                isSaved={libraryByRecipeId.has(match.recipe.id)}
+                onOpen={openRecipe}
+                onToggleSaved={onBuiltInRecipe}
+              />
+            </li>
           ))}
         </ul>
       ) : (
