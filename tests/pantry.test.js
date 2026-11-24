@@ -6,9 +6,24 @@ import {
   loadPantry,
   matchesIngredientSearch,
   normalizeIngredientName,
+  recoverPantryIngredients,
   savePantry,
   wouldDuplicateIngredient,
 } from '../src/utils/pantry.js'
+
+test('recovery preserves saved and session ingredients when IDs collide', (context) => {
+  const saved = [{ id: 'collision', name: 'Bawang', category: 'Vegetables', isAvailable: true }]
+  const session = [
+    { id: 'collision', name: 'Egg', category: 'Dairy and Eggs', isAvailable: false },
+    { id: 'reserved', name: 'Itlog', category: 'Dairy and Eggs', isAvailable: true },
+  ]
+  context.mock.method(crypto, 'randomUUID', () => 'new-id')
+  crypto.randomUUID.mock.mockImplementationOnce(() => 'reserved')
+  const result = recoverPantryIngredients(saved, session)
+  assert.deepEqual(result.ingredients, [saved[0], { ...session[0], id: 'new-id' }, session[1]])
+  assert.deepEqual(result.remappedIds, new Map([['collision', 'new-id']]))
+  assert.equal(session[0].id, 'collision')
+})
 
 const expectedAliases = [
   ['bay leaf', ['bay leaves', 'dahon ng laurel']],

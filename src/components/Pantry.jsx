@@ -6,6 +6,7 @@ import PantryForm from './PantryForm.jsx'
 const Pantry = ({
   initialView,
   pantryStorageStatus,
+  pantryIdRemaps,
   ingredients,
   onAddIngredient,
   onEditIngredient,
@@ -23,12 +24,13 @@ const Pantry = ({
   const [activeView, setActiveView] = useState(initialView)
   const showIngredients = activeView === 'ingredients'
   const [isAdding, setIsAdding] = useState(false)
-  const [editingId, setEditingId] = useState(null)
+  const [editor, setEditor] = useState(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [availabilityFilter, setAvailabilityFilter] = useState('')
   const addButton = useRef(null)
   const formTrigger = useRef(null)
+  const nextEditorKey = useRef(0)
   const availabilitySelect = useRef(null)
 
   const availableCount = ingredients.filter((ingredient) => ingredient.isAvailable).length
@@ -42,23 +44,28 @@ const Pantry = ({
     return nameMatches && categoryMatches && availabilityMatches
   }
   const visibleIngredients = ingredients.filter(matchesFilters)
+  const remappedEditId = editor && editor.idRemaps !== pantryIdRemaps ? pantryIdRemaps?.get(editor.id) : undefined
+  const editingId = remappedEditId ?? editor?.id
   const editingIngredient = ingredients.find((ingredient) => ingredient.id === editingId)
 
   const handleOpenAdd = (event) => {
     formTrigger.current = event.currentTarget
-    setEditingId(null)
+    setEditor(null)
     setIsAdding(true)
   }
 
   const handleOpenEdit = (id, event) => {
+    if (id === editingId) return
     formTrigger.current = event.currentTarget
     setIsAdding(false)
-    setEditingId(id)
+    const key = nextEditorKey.current
+    nextEditorKey.current += 1
+    setEditor({ id, idRemaps: pantryIdRemaps, key })
   }
 
-  const handleCloseForm = (focusTarget = formTrigger.current) => {
+  const handleCloseForm = (focusTarget = remappedEditId ? addButton.current : formTrigger.current) => {
     setIsAdding(false)
-    setEditingId(null)
+    setEditor(null)
     const nextFocus = focusTarget?.isConnected ? focusTarget : addButton.current
     nextFocus?.focus()
     formTrigger.current = null
@@ -67,7 +74,7 @@ const Pantry = ({
   const handleSaveEdit = (values) => {
     const updatedIngredient = { ...editingIngredient, ...values }
     onEditIngredient(editingId, values)
-    handleCloseForm(matchesFilters(updatedIngredient) ? formTrigger.current : addButton.current)
+    handleCloseForm(!remappedEditId && matchesFilters(updatedIngredient) ? formTrigger.current : addButton.current)
   }
 
   const handleConfirmRemove = (ingredient) => {
@@ -110,7 +117,7 @@ const Pantry = ({
         {isAdding && <PantryForm key="add" ingredients={ingredients} onSave={onAddIngredient} onCancel={() => handleCloseForm()} />}
         {editingIngredient && (
           <PantryForm
-            key={editingIngredient.id}
+              key={editor.key}
             ingredient={editingIngredient}
             ingredients={ingredients}
             onSave={handleSaveEdit}

@@ -31,7 +31,7 @@ import {
   addMissingGroceryItems, loadGroceryList, prepareGroceryItem, recoverGroceryItems, removeGroceryItem,
   saveGroceryList, setGroceryPurchased, transferPurchasedItems,
 } from './utils/groceryList.js'
-import { loadPantry, savePantry } from './utils/pantry.js'
+import { createPantryIngredientId, loadPantry, recoverPantryIngredients, savePantry } from './utils/pantry.js'
 import {
   addCookingRecency,
   advanceRecommendationSession,
@@ -64,6 +64,7 @@ const App = ({ canReconcilePhotos }) => {
   const [initialPantryView, setInitialPantryView] = useState('ingredients')
   const [dishesView, setDishesView] = useState('library')
   const [pantry, setPantry] = useState(loadPantry)
+  const [pantryIdRemaps, setPantryIdRemaps] = useState(null)
   const [groceryList, setGroceryList] = useState(loadGroceryList)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
   const [cookingHistory, setCookingHistory] = useState(() => {
@@ -229,17 +230,14 @@ const App = ({ canReconcilePhotos }) => {
       return
     }
 
-    const recoveredIds = new Set(recoveredPantry.ingredients.map((ingredient) => ingredient.id))
-    const sessionIngredients = currentPantry.ingredients.filter((ingredient) => !recoveredIds.has(ingredient.id))
-    if (sessionIngredients.length === 0) {
+    if (currentPantry.ingredients.length === 0) {
       commitPantry(recoveredPantry)
       return
     }
 
-    saveAndCommitPantry({
-      ...recoveredPantry,
-      ingredients: [...recoveredPantry.ingredients, ...sessionIngredients],
-    })
+    const { ingredients, remappedIds } = recoverPantryIngredients(recoveredPantry.ingredients, currentPantry.ingredients)
+    if (remappedIds.size > 0) setPantryIdRemaps(remappedIds)
+    saveAndCommitPantry({ ...recoveredPantry, ingredients })
   }
 
   const handleReplaceSavedPantry = () => {
@@ -368,8 +366,10 @@ const App = ({ canReconcilePhotos }) => {
   }
 
   const handleAddIngredient = (values) => {
-    const ingredient = { ...values, id: crypto.randomUUID() }
-    updatePantry((ingredients) => [...ingredients, ingredient])
+    updatePantry((ingredients) => {
+      const id = createPantryIngredientId(new Set(ingredients.map((ingredient) => ingredient.id)))
+      return [...ingredients, { ...values, id }]
+    })
   }
 
   const handleEditIngredient = (id, values) => {
@@ -698,6 +698,7 @@ const App = ({ canReconcilePhotos }) => {
       <Pantry
         initialView={initialPantryView}
         pantryStorageStatus={pantry.storageStatus}
+        pantryIdRemaps={pantryIdRemaps}
         ingredients={pantry.ingredients}
         onAddIngredient={handleAddIngredient}
         onEditIngredient={handleEditIngredient}

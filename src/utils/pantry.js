@@ -114,6 +114,26 @@ export const wouldDuplicateIngredient = (name, ingredients, currentIngredient) =
 
 const storageKey = 'lutong-ina-pantry'
 
+export const createPantryIngredientId = (usedIds) => {
+  let id = crypto.randomUUID()
+  while (usedIds.has(id)) id = crypto.randomUUID()
+  return id
+}
+
+export const recoverPantryIngredients = (saved, session) => {
+  const savedIds = new Set(saved.map((ingredient) => ingredient.id))
+  const usedIds = new Set([...savedIds, ...session.map((ingredient) => ingredient.id)])
+  const remappedIds = new Map()
+  const additions = session.map((ingredient) => {
+    if (!savedIds.has(ingredient.id)) return ingredient
+    const id = createPantryIngredientId(usedIds)
+    usedIds.add(id)
+    remappedIds.set(ingredient.id, id)
+    return { ...ingredient, id }
+  })
+  return { ingredients: [...saved, ...additions], remappedIds }
+}
+
 export const loadPantry = () => {
   const ingredients = []
   let savedPantry

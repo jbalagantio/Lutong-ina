@@ -67,6 +67,6 @@ Run `node --test` to verify recipe and photo utilities, ingredient matching, pan
 
 If browser storage is unavailable, you can keep editing the pantry in memory and retry loading or saving. A successful load retry keeps saved entries alongside ingredients added during the outage. If saved data is unreadable or only partly recoverable, it is kept as-is until you confirm **Replace saved pantry**. Unsaved changes can be lost on refresh.
 
-If a load retry brings back an alias equivalent to an ingredient entered during the outage, both entries keep their names and availability. Recommendations count the ingredient once, and either entry can satisfy the match when available.
+If a load retry brings back an alias equivalent to an ingredient entered during the outage, both entries keep their names and availability. Recommendations count the ingredient once, and either entry can satisfy the match when available. If saved and session ingredients share an ID, the session entry receives a new ID and any open edit follows it.
 
 Codex assisted with the React components, CSS, sample recipe data, pantry behavior, recommendation rules, and verification.
