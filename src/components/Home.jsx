@@ -58,7 +58,7 @@ const Home = ({ ingredients, mode, round, eligibleMatches, isFamiliarFallback, o
   return (
     <div className="home-layout">
       <section aria-labelledby="home-heading">
-        <h1 id="home-heading">What should I <em>cook</em> today?</h1>
+        <h1 id="home-heading" tabIndex={-1}>What should I <em>cook</em> today?</h1>
         <ul className="option-list">
           {cookingOptions.map((option) => (
             <li key={option.id}>

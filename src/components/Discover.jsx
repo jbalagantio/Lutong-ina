@@ -1,7 +1,7 @@
 const Discover = () => {
   return (
     <section className="screen-panel" aria-labelledby="discover-heading">
-      <h1 id="discover-heading" lang="fil">Ma, <em>anong ulam?</em></h1>
+      <h1 id="discover-heading" lang="fil" tabIndex={-1}>Ma, <em>anong ulam?</em></h1>
       <div className="search-field">
         <label className="visually-hidden" htmlFor="recipe-search">Search recipes</label>
         <input

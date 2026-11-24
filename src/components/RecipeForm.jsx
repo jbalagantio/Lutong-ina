@@ -136,6 +136,7 @@ const RecipeForm = ({ recipe, onSave, onCancel, onDraftChange }) => {
     const values = { ...draft, instructions: draft.instructions.map((step) => step.text) }
     submitting.current = true
     setIsSaving(true)
+    setError('')
     try {
       const validationError = await onSave(values, draftPhoto)
       if (validationError) setError(validationError)
@@ -145,9 +146,22 @@ const RecipeForm = ({ recipe, onSave, onCancel, onDraftChange }) => {
     }
   }
 
+  const handleInputKeyDown = (event) => {
+    const input = event.target
+    if (event.key === 'Enter' && !event.nativeEvent.isComposing &&
+        (input.type === 'text' || input.type === 'number') && input.tagName === 'INPUT') {
+      event.preventDefault()
+    }
+  }
+
+  let progress = ''
+  if (isReadingPhoto) progress = 'Preparing photo…'
+  if (isSaving) progress = 'Saving recipe…'
+
   return (
-    <form className="recipe-form" aria-labelledby="recipe-form-heading" onSubmit={handleSubmit} noValidate>
+    <form className="recipe-form" aria-labelledby="recipe-form-heading" onSubmit={handleSubmit} onKeyDown={handleInputKeyDown} noValidate>
       <h2 id="recipe-form-heading">{recipe ? 'Edit recipe' : 'Add recipe'}</h2>
+      <p role="status" className={progress ? 'recipe-form-status' : 'visually-hidden'}>{progress}</p>
       <fieldset className="recipe-editor-fields" disabled={isSaving}>
         <div className="recipe-fields">
           <label>Recipe name

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import recipes from '../data/recipes.js'
 import { filterRecipeCollection, getRecipeCollection, hasDuplicateRecipeNames, normalizeRecipeName } from '../utils/myDishes.js'
 import LibraryRecipeRow from './LibraryRecipeRow.jsx'
@@ -37,6 +37,8 @@ const MyDishes = ({
   const [isBrowsing, setIsBrowsing] = useState(false)
   const addButton = useRef(null)
   const filterSelect = useRef(null)
+  const searchInput = useRef(null)
+  const focusCatalogSearch = useRef(false)
   const formTrigger = useRef(null)
   const nextEditorKey = useRef(0)
   const searchTerm = normalizeRecipeName(search)
@@ -48,6 +50,12 @@ const MyDishes = ({
   const warning = storageStatus === 'duplicate-names' ? '' : storageWarnings[storageStatus]
   const hasNameConflict = hasDuplicateRecipeNames(personalRecipes)
   const needsReplacement = storageStatus === 'invalid' || storageStatus === 'partial'
+
+  useLayoutEffect(() => {
+    if (!isBrowsing || !focusCatalogSearch.current) return
+    focusCatalogSearch.current = false
+    searchInput.current?.focus()
+  }, [isBrowsing])
 
   const openEditor = (event, recipe) => {
     if (editor && editor.recipe === recipe) {
@@ -75,7 +83,7 @@ const MyDishes = ({
     onDraftChange(false)
   }
 
-  const handleToggleBrowse = () => {
+  const handleToggleBrowse = (event) => {
     if (!canDiscardDraft()) {
       return
     }
@@ -83,6 +91,7 @@ const MyDishes = ({
     formTrigger.current = null
     onDraftChange(false)
     setExpandedId(null)
+    focusCatalogSearch.current = !isBrowsing && event.detail === 0
     setIsBrowsing(!isBrowsing)
   }
 
@@ -158,7 +167,7 @@ const MyDishes = ({
   return (
     <section className="my-dishes" aria-labelledby="dishes-heading">
       <div className="dishes-header">
-        <h1 id="dishes-heading">My Dishes</h1>
+        <h1 id="dishes-heading" tabIndex={-1}>My Dishes</h1>
         <div className="pantry-actions">
           <button type="button" className="pantry-button" onClick={handleToggleBrowse}>
             {isBrowsing ? 'Back to My Dishes' : 'Browse recipes'}
@@ -204,7 +213,7 @@ const MyDishes = ({
       <div className="pantry-fields dishes-filters">
         <label>
           <span className="visually-hidden">{isBrowsing ? 'Search catalog' : 'Search My Dishes'}</span>
-          <input id={isBrowsing ? 'catalog-recipe-search' : 'personal-recipe-search'} type="search" value={isBrowsing ? catalogSearch : search}
+          <input ref={searchInput} id={isBrowsing ? 'catalog-recipe-search' : 'personal-recipe-search'} type="search" value={isBrowsing ? catalogSearch : search}
             placeholder={isBrowsing ? 'Search catalog' : 'Search My Dishes'}
             onChange={(event) => {
               if (isBrowsing) setCatalogSearch(event.target.value)
@@ -260,7 +269,7 @@ const MyDishes = ({
               {item.isPersonal ? (
                 <>
                   <button className="pantry-button" type="button" aria-label={`Edit ${item.recipe.name}`} onClick={(event) => openEditor(event, item.recipe)}>Edit</button>
-                  <button className="pantry-button" type="button" aria-label={`Delete ${item.recipe.name}`} onClick={() => handleDelete(item.recipe)}>Delete</button>
+                  <button className="pantry-button destructive-button" type="button" aria-label={`Delete ${item.recipe.name}`} onClick={() => handleDelete(item.recipe)}>Delete</button>
                 </>
               ) : (
                 <button className="pantry-button" type="button" aria-label={`Remove saved ${item.recipe.name}`} onClick={() => handleBuiltInAction(item.recipe, false)}>Remove saved</button>

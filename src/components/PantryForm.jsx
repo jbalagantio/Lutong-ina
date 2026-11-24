@@ -1,30 +1,38 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { pantryCategories, pantryNameLimit, wouldDuplicateIngredient } from '../utils/pantry.js'
 
 const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
   const [name, setName] = useState(ingredient?.name ?? '')
   const [category, setCategory] = useState(ingredient?.category ?? '')
   const [isAvailable, setIsAvailable] = useState(true)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null)
+  const nameInput = useRef(null)
+  const categoryInput = useRef(null)
+
+  const showError = (field, message) => {
+    setError({ field, message })
+    const input = field === 'name' ? nameInput : categoryInput
+    input.current?.focus()
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault()
     const trimmedName = name.trim()
 
     if (!trimmedName) {
-      setError('Enter an ingredient name.')
+      showError('name', 'Enter an ingredient name.')
       return
     }
     if (trimmedName.length > pantryNameLimit) {
-      setError(`Use ${pantryNameLimit} characters or fewer for the ingredient name.`)
+      showError('name', `Use ${pantryNameLimit} characters or fewer for the ingredient name.`)
       return
     }
     if (!pantryCategories.includes(category)) {
-      setError('Select a valid category.')
+      showError('category', 'Select a valid category.')
       return
     }
     if (wouldDuplicateIngredient(trimmedName, ingredients, ingredient)) {
-      setError('That ingredient is already in your pantry.')
+      showError('name', 'That ingredient is already in your pantry.')
       return
     }
 
@@ -39,20 +47,32 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
     setName('')
     setCategory('')
     setIsAvailable(true)
-    setError('')
+    setError(null)
   }
 
   return (
-    <form className="pantry-form" aria-labelledby="ingredient-form-heading" onSubmit={handleSubmit}>
+    <form className="pantry-form" aria-labelledby="ingredient-form-heading" onSubmit={handleSubmit} noValidate>
       <h2 id="ingredient-form-heading">{ingredient ? 'Edit ingredient' : 'Add ingredient'}</h2>
       <div className="pantry-fields">
         <label>
           Ingredient name
-          <input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+          <input ref={nameInput} value={name} required autoFocus
+            aria-invalid={error?.field === 'name' || undefined}
+            aria-describedby={error?.field === 'name' ? 'ingredient-form-error' : undefined}
+            onChange={(event) => {
+              setName(event.target.value)
+              if (error?.field === 'name') setError(null)
+            }} />
         </label>
         <label>
           Category
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <select ref={categoryInput} value={category} required
+            aria-invalid={error?.field === 'category' || undefined}
+            aria-describedby={error?.field === 'category' ? 'ingredient-form-error' : undefined}
+            onChange={(event) => {
+              setCategory(event.target.value)
+              if (error?.field === 'category') setError(null)
+            }}>
             <option value="">Choose a category</option>
             {pantryCategories.map((item) => <option key={item}>{item}</option>)}
           </select>
@@ -68,7 +88,7 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
           Available
         </label>
       )}
-      {error && <p className="pantry-error" role="alert">{error}</p>}
+      {error && <p id="ingredient-form-error" className="pantry-error" role="alert">{error.message}</p>}
       <div className="pantry-actions">
         <button className="pantry-button pantry-primary" type="submit">
           {ingredient ? 'Save changes' : 'Add'}

@@ -78,7 +78,7 @@ const Pantry = ({
   return (
     <section className="pantry-panel" aria-labelledby="pantry-heading">
       <div className="pantry-header">
-        <h1 id="pantry-heading">My Pantry</h1>
+        <h1 id="pantry-heading" tabIndex={-1}>My Pantry</h1>
         <button ref={addButton} className="pantry-button pantry-primary" type="button" onClick={handleOpenAdd}>
           Add ingredient
         </button>
@@ -158,7 +158,7 @@ const Pantry = ({
                     </svg>
                   </button>
                   <button
-                    className="icon-button"
+                    className="icon-button destructive-button"
                     type="button"
                     aria-label={`Remove ${ingredient.name}`}
                     title="Remove"

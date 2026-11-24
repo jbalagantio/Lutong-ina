@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Header from './components/Header.jsx'
 import Navigation from './components/Navigation.jsx'
 import Home from './components/Home.jsx'
@@ -52,6 +52,8 @@ const App = ({ canReconcilePhotos }) => {
   const [pantry, setPantry] = useState(loadPantry)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
+  const mainContent = useRef(null)
+  const hasNavigated = useRef(false)
   const latestPantry = useRef(pantry)
   const latestDishes = useRef(myDishes)
   const pendingLibraryChanges = useRef(new Map())
@@ -60,6 +62,12 @@ const App = ({ canReconcilePhotos }) => {
   const [photoCleanupError, setPhotoCleanupError] = useState(false)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
+
+  useLayoutEffect(() => {
+    if (!hasNavigated.current) return
+    hasNavigated.current = false
+    mainContent.current?.querySelector('h1')?.focus()
+  }, [activeScreen])
 
   const commitPantry = (nextPantry) => {
     // Consecutive actions can run before React renders the previous update.
@@ -354,6 +362,7 @@ const App = ({ canReconcilePhotos }) => {
         refreshRecommendationRound(session, session.mode, matches, randomValue, dishes.libraryEntries)
       ))
     }
+    if (screen !== activeScreen) hasNavigated.current = true
     setActiveScreen(screen)
     if (screen === 'my-dishes') void cleanUpPhotos()
   }
@@ -428,11 +437,12 @@ const App = ({ canReconcilePhotos }) => {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <div className="app-bar">
         <Header />
         <Navigation activeScreen={activeScreen} onNavigate={handleNavigate} />
       </div>
-      <main className="main-content">
+      <main ref={mainContent} id="main-content" className="main-content" tabIndex={-1}>
         {storageWarning && (
           <div className="storage-warning">
             <p role="alert">
