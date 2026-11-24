@@ -117,69 +117,71 @@ const storageKey = 'lutong-ina-pantry'
 export const loadPantry = () => {
   const ingredients = []
   let savedPantry
-  let loadWarning = ''
 
   try {
     savedPantry = localStorage.getItem(storageKey)
   } catch {
-    return {
-      ingredients,
-      hasChanges: false,
-      canSave: false,
-      loadWarning: 'Your saved pantry could not be loaded. Changes will stay in this session only.',
-    }
+    return { ingredients, storageStatus: 'read-failed' }
   }
 
+  if (savedPantry === null) {
+    return { ingredients, storageStatus: 'ready' }
+  }
+
+  let savedIngredients
   try {
-    const savedIngredients = savedPantry === null ? [] : JSON.parse(savedPantry)
-
-    if (!Array.isArray(savedIngredients)) {
-      throw new Error('Expected a pantry list.')
-    }
-
-    const savedIds = new Set()
-    for (const ingredient of savedIngredients) {
-      if (
-        !ingredient ||
-        typeof ingredient.id !== 'string' ||
-        !ingredient.id.trim() ||
-        typeof ingredient.name !== 'string' ||
-        !pantryCategories.includes(ingredient.category) ||
-        typeof ingredient.isAvailable !== 'boolean'
-      ) {
-        continue
-      }
-
-      const name = ingredient.name
-      const trimmedName = name.trim()
-      if (!trimmedName || trimmedName.length > pantryNameLimit || savedIds.has(ingredient.id)) {
-        continue
-      }
-
-      ingredients.push({
-        id: ingredient.id,
-        name,
-        category: ingredient.category,
-        isAvailable: ingredient.isAvailable,
-      })
-      savedIds.add(ingredient.id)
-    }
-
-    if (ingredients.length < savedIngredients.length) {
-      loadWarning = 'Some saved pantry entries could not be loaded. Valid entries are shown below.'
-    }
+    savedIngredients = JSON.parse(savedPantry)
   } catch {
-    loadWarning = 'The saved pantry could not be read. You can start a new pantry here.'
+    return { ingredients, storageStatus: 'invalid' }
+  }
+  if (!Array.isArray(savedIngredients)) {
+    return { ingredients, storageStatus: 'invalid' }
   }
 
-  return { ingredients, hasChanges: false, canSave: true, loadWarning }
+  const savedIds = new Set()
+  for (const ingredient of savedIngredients) {
+    if (
+      !ingredient ||
+      typeof ingredient.id !== 'string' ||
+      !ingredient.id.trim() ||
+      typeof ingredient.name !== 'string' ||
+      !pantryCategories.includes(ingredient.category) ||
+      typeof ingredient.isAvailable !== 'boolean'
+    ) {
+      continue
+    }
+
+    const name = ingredient.name
+    const trimmedName = name.trim()
+    if (!trimmedName || trimmedName.length > pantryNameLimit || savedIds.has(ingredient.id)) {
+      continue
+    }
+
+    ingredients.push({
+      id: ingredient.id,
+      name,
+      category: ingredient.category,
+      isAvailable: ingredient.isAvailable,
+    })
+    savedIds.add(ingredient.id)
+  }
+
+  const storageStatus = ingredients.length < savedIngredients.length ? 'partial' : 'ready'
+  return { ingredients, storageStatus }
 }
 
-export const savePantry = (ingredients) => {
+export const savePantry = ({ ingredients, storageStatus }) => {
+  if (storageStatus === 'read-failed' || storageStatus === 'invalid' || storageStatus === 'partial') {
+    return storageStatus
+  }
+
   try {
     localStorage.setItem(storageKey, JSON.stringify(ingredients))
-    return true
-  } catch {
-    return false
+    return 'ready'
+  } catch (error) {
+    if (error?.name === 'QuotaExceededError') {
+      return 'quota-exceeded'
+    }
+    return 'write-failed'
   }
 }

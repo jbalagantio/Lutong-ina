@@ -306,6 +306,10 @@ h1 em {
   background: #2c231b;
 }
 
+.storage-warning button {
+  margin-top: 0.65rem;
+}
+
 .suggestion-empty {
   display: grid;
   justify-items: center;

@@ -6,6 +6,7 @@ import {
   loadPantry,
   matchesIngredientSearch,
   normalizeIngredientName,
+  savePantry,
   wouldDuplicateIngredient,
 } from '../src/utils/pantry.js'
 
@@ -92,15 +93,13 @@ test('only rejects creation or editing that introduces a duplicate', () => {
   assert.equal(wouldDuplicateIngredient('unlisted spice', ingredients), false)
 })
 
-test('loading preserves legacy aliases, display names, and each availability status', (context) => {
-  const ingredients = [
-    { id: '1', name: ' Water  spinach ', category: 'Vegetables', isAvailable: false },
-    { id: '2', name: 'KANGKONG', category: 'Others', isAvailable: true },
-  ]
-  const storage = {
-    getItem: context.mock.fn(() => JSON.stringify(ingredients)),
-    setItem: context.mock.fn(),
-  }
+const pantryKey = 'lutong-ina-pantry'
+const savedIngredients = [
+  { id: '1', name: ' Water  spinach ', category: 'Vegetables', isAvailable: false },
+  { id: '2', name: 'KANGKONG', category: 'Others', isAvailable: true },
+]
+
+const installStorage = (context, storage) => {
   const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
   context.after(() => {
@@ -110,10 +109,91 @@ test('loading preserves legacy aliases, display names, and each availability sta
       Reflect.deleteProperty(globalThis, 'localStorage')
     }
   })
-  const result = loadPantry()
-  assert.deepEqual(result.ingredients, ingredients)
-  assert.equal(result.loadWarning, '')
-  assert.equal(storage.setItem.mock.callCount(), 0)
+}
+
+test('loads missing, empty, valid, malformed and non-array data without writing', (context) => {
+  const setItem = context.mock.fn()
+  const loadCases = [
+    [null, [], 'ready'],
+    ['[]', [], 'ready'],
+    [JSON.stringify(savedIngredients), savedIngredients, 'ready'],
+    ['{malformed', [], 'invalid'],
+    ['{"ingredients":[]}', [], 'invalid'],
+    ['null', [], 'invalid'],
+  ]
+  let storedValue
+  const getItem = context.mock.fn(() => storedValue)
+  installStorage(context, { getItem, setItem })
+
+  for (const [rawData, ingredients, storageStatus] of loadCases) {
+    storedValue = rawData
+    assert.deepEqual(loadPantry(), { ingredients, storageStatus })
+  }
+  assert.ok(getItem.mock.calls.every((call) => call.arguments[0] === pantryKey))
+  assert.equal(setItem.mock.callCount(), 0)
+})
+
+test('recovers valid entries with their names and stock statuses and skips duplicate IDs', (context) => {
+  const storedValue = JSON.stringify([
+    null,
+    { ...savedIngredients[0], name: ' ' },
+    ...savedIngredients,
+    { ...savedIngredients[0], name: 'Changed' },
+    { id: '3', name: 'Salt', category: 'Seasonings', isAvailable: 'true' },
+  ])
+  const setItem = context.mock.fn()
+  installStorage(context, { getItem: () => storedValue, setItem })
+
+  assert.deepEqual(loadPantry(), { ingredients: savedIngredients, storageStatus: 'partial' })
+  assert.equal(setItem.mock.callCount(), 0)
+})
+
+test('blocked reads and invalid or partial data prevent saving until storage is recovered or replacement is acknowledged', (context) => {
+  let blocked = true
+  const setItem = context.mock.fn()
+  const getItem = () => {
+    if (blocked) {
+      throw new DOMException('Read blocked', 'SecurityError')
+    }
+    return JSON.stringify(savedIngredients)
+  }
+  installStorage(context, { getItem, setItem })
+  assert.deepEqual(loadPantry(), { ingredients: [], storageStatus: 'read-failed' })
+
+  for (const storageStatus of ['read-failed', 'invalid', 'partial']) {
+    assert.equal(savePantry({ ingredients: savedIngredients, storageStatus }), storageStatus)
+  }
+  assert.equal(setItem.mock.callCount(), 0)
+  blocked = false
+  assert.deepEqual(loadPantry(), { ingredients: savedIngredients, storageStatus: 'ready' })
+  assert.equal(setItem.mock.callCount(), 0)
+})
+
+test('reports write and quota failures, retries successfully, and writes only the pantry key', (context) => {
+  const original = JSON.stringify(savedIngredients)
+  const values = new Map([[pantryKey, original], ['unrelated', 'keep']])
+  let writeError = new DOMException('Write blocked', 'SecurityError')
+  const setItem = context.mock.fn((key, value) => {
+    if (writeError) {
+      throw writeError
+    }
+    values.set(key, value)
+  })
+  installStorage(context, { setItem })
+
+  const pantry = { ingredients: [], storageStatus: 'ready' }
+  const writeFailure = savePantry(pantry)
+  assert.equal(writeFailure, 'write-failed')
+  assert.equal(values.get(pantryKey), original)
+  writeError = new DOMException('Full storage', 'QuotaExceededError')
+  const quotaFailure = savePantry({ ...pantry, storageStatus: writeFailure })
+  assert.equal(quotaFailure, 'quota-exceeded')
+  assert.equal(values.get(pantryKey), original)
+  writeError = null
+  assert.equal(savePantry({ ...pantry, storageStatus: quotaFailure }), 'ready')
+  assert.equal(values.get(pantryKey), '[]')
+  assert.equal(values.get('unrelated'), 'keep')
+  assert.ok(setItem.mock.calls.every((call) => call.arguments[0] === pantryKey))
 })
 
 test('search finds saved, canonical and alias substrings in both directions', () => {

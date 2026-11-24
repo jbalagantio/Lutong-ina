@@ -29,4 +29,6 @@ Pantry search accepts partial names in both English and Filipino when an explici
 
 Run `node --test` to verify ingredient matching, pantry utilities, and recommendation rules.
 
+If browser storage is unavailable, you can keep editing the pantry in memory and retry loading or saving. A successful load retry keeps saved entries alongside ingredients added during the outage. If saved data is unreadable or only partly recoverable, it is kept as-is until you confirm **Replace saved pantry**. Unsaved changes can be lost on refresh.
+
 Codex assisted with the React components, CSS, sample recipe data, pantry behavior, recommendation rules, and verification.
