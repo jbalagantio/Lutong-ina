@@ -9,11 +9,11 @@ import { loadPantry, savePantry } from './utils/pantry.js'
 import './App.css'
 
 const storageWarnings = {
-  'read-failed': 'Your saved pantry could not be loaded. Changes are only available in memory. Retry loading to recover your saved pantry.',
-  invalid: 'Your saved pantry could not be read. Changes are only available in memory until you confirm replacement.',
-  partial: 'Some saved pantry entries could not be recovered. Recovered entries and any changes are only available in memory until you confirm replacement.',
-  'write-failed': 'Your pantry changes could not be saved. They are only available in memory.',
-  'quota-exceeded': 'Your pantry changes could not be saved because browser storage is full. Changes are only available in memory until saving succeeds.',
+  'read-failed': 'Could not open the saved pantry.',
+  invalid: 'The saved pantry is unreadable.',
+  partial: 'Only some saved ingredients could be recovered.',
+  'write-failed': 'Could not save pantry changes.',
+  'quota-exceeded': 'Browser storage is full. Pantry changes could not be saved.',
 }
 
 const App = () => {
@@ -147,6 +147,7 @@ const App = () => {
             <p role="alert">
               {storageWarning}
               {pantry.replacementError && ` ${storageWarnings[pantry.replacementError]}`}
+              {needsReplacement ? ' Changes stay in memory until you replace the saved pantry.' : ' Changes stay in memory until saved.'}
             </p>
             {needsReplacement ? (
               <button className="pantry-button" type="button" onClick={handleReplaceSavedPantry}>

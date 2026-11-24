@@ -1,16 +1,21 @@
 :root {
   color-scheme: dark;
   font-family: 'Segoe UI', system-ui, sans-serif;
-  color: #f8ebd9;
-  background: #101312;
+  color: var(--cream);
+  background: var(--forest);
   line-height: 1.5;
+  scroll-padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
 
-  --cream: #f8ebd9;
-  --surface: #191e1b;
-  --border: #38413a;
-  --muted: #c0c5ba;
-  --orange: #ffa66d;
-  --green: #b2d5a7;
+  --forest: #0c1a12;
+  --background: #101813;
+  --espresso: #241810;
+  --surface: #0c130f;
+  --orange: #f5a46b;
+  --cream: #f5e8d5;
+  --green: #8faf91;
+  --muted: #b8b9ae;
+  --border: color-mix(in srgb, var(--green) 28%, transparent);
+  --control-border: color-mix(in srgb, var(--green) 76%, var(--surface));
   --heading-font: Georgia, 'Times New Roman', serif;
 }
 
@@ -21,6 +26,7 @@
 body,
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -32,8 +38,18 @@ h2 {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 :focus-visible {

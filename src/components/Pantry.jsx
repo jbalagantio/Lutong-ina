@@ -57,12 +57,9 @@ const Pantry = ({
   }
 
   return (
-    <section className="screen-panel pantry-panel" aria-labelledby="pantry-heading">
+    <section className="pantry-panel" aria-labelledby="pantry-heading">
       <div className="pantry-header">
-        <div>
-          <h1 id="pantry-heading">My Pantry</h1>
-          <p>Keep track of what you have on hand and what you’re out of.</p>
-        </div>
+        <h1 id="pantry-heading">My Pantry</h1>
         <button className="pantry-button pantry-primary" type="button" onClick={handleOpenAdd}>
           Add ingredient
         </button>
@@ -83,18 +80,18 @@ const Pantry = ({
       )}
       <div className="pantry-fields pantry-filters" role="group" aria-label="Filter ingredients">
         <label>
-          Search ingredients
-          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <span className="visually-hidden">Search ingredients</span>
+          <input type="search" placeholder="Search ingredients" value={search} onChange={(event) => setSearch(event.target.value)} />
         </label>
         <label>
-          Filter by category
+          <span className="visually-hidden">Filter by category</span>
           <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="">All categories</option>
             {pantryCategories.map((category) => <option key={category}>{category}</option>)}
           </select>
         </label>
         <label>
-          Filter by availability
+          <span className="visually-hidden">Filter by availability</span>
           <select value={availabilityFilter} onChange={(event) => setAvailabilityFilter(event.target.value)}>
             <option value="">All statuses</option>
             <option value="available">Available</option>
@@ -103,49 +100,54 @@ const Pantry = ({
         </label>
       </div>
       {ingredients.length === 0 && (
-        <p className="pantry-empty">Your pantry is empty. Add an ingredient to get started.</p>
+        <p className="pantry-empty">Your pantry is empty.</p>
       )}
       {ingredients.length > 0 && visibleIngredients.length === 0 && (
-        <p className="pantry-empty" role="status">No ingredients match your search and filters.</p>
+        <p className="pantry-empty" role="status">No matching ingredients.</p>
       )}
       {visibleIngredients.length > 0 && (
         <ul className="pantry-list" aria-label="Pantry ingredients">
           {visibleIngredients.map((ingredient) => {
             const status = ingredient.isAvailable ? 'Available' : 'Out of stock'
-            const toggleLabel = ingredient.isAvailable ? 'Mark out of stock' : 'Mark available'
 
             return (
               <li className="pantry-item" key={ingredient.id}>
-                <div>
+                <div className="pantry-item-name">
                   <strong>{ingredient.name}</strong>
-                  <p>
-                    {ingredient.category} · <span className={ingredient.isAvailable ? 'pantry-available' : undefined}>{status}</span>
-                  </p>
+                  <p>{ingredient.category}</p>
                 </div>
                 <div className="pantry-actions">
+                  <label className="pantry-stock">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      aria-label={`Available: ${ingredient.name}`}
+                      checked={ingredient.isAvailable}
+                      onChange={() => onToggleAvailability(ingredient.id)}
+                    />
+                    <span className={ingredient.isAvailable ? 'pantry-available' : undefined} aria-hidden="true">{status}</span>
+                  </label>
                   <button
-                    className="pantry-button"
-                    type="button"
-                    aria-label={`${toggleLabel} for ${ingredient.name}`}
-                    onClick={() => onToggleAvailability(ingredient.id)}
-                  >
-                    {toggleLabel}
-                  </button>
-                  <button
-                    className="pantry-button"
+                    className="icon-button"
                     type="button"
                     aria-label={`Edit ${ingredient.name}`}
+                    title="Edit"
                     onClick={() => handleOpenEdit(ingredient.id)}
                   >
-                    Edit
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m14 6 4 4M4 20l1-5L16 4a2.8 2.8 0 0 1 4 4L9 19z" />
+                    </svg>
                   </button>
                   <button
-                    className="pantry-button"
+                    className="icon-button"
                     type="button"
                     aria-label={`Remove ${ingredient.name}`}
+                    title="Remove"
                     onClick={() => handleConfirmRemove(ingredient)}
                   >
-                    Remove
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 6h18M9 6V3h6v3M6 6l1 14h10l1-14M10 10v6m4-6v6" />
+                    </svg>
                   </button>
                 </div>
               </li>

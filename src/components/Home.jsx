@@ -12,20 +12,17 @@ const cookingOptions = [
   {
     id: 'pantry',
     title: 'Use what I have',
-    description: 'Find the best match for your pantry.',
-    symbol: '\u25a4',
+    icon: 'M4 7h16v13H4z M3 4h18v3H3z M9 12h6',
   },
   {
     id: 'shopping',
     title: "I'll go grocery shopping",
-    description: 'Find a dish you can shop for.',
-    symbol: '+',
+    icon: 'M3 9h18l-2 10H5z M8 9l4-5 4 5 M9 13v3 M15 13v3',
   },
   {
     id: 'new',
     title: 'Something new',
-    description: 'Explore dishes from the recipe collection.',
-    symbol: '\u2726',
+    icon: 'M11 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z M19 15v6 M16 18h6',
   },
 ]
 
@@ -66,37 +63,37 @@ const Home = ({ ingredients, onOpenPantry }) => {
     setSuggestedIds(firstMatch ? [firstMatch.recipe.id] : [])
   }
 
-  let emptyTitle = 'How would you like to cook today?'
-  let emptyMessage = 'Choose a cooking mode to get a recipe suggestion.'
+  let emptyMessage = 'No recipes available.'
 
   if (mode === 'pantry') {
-    emptyTitle = 'No suitable pantry recipes found'
     if (ingredients.length === 0) {
-      emptyMessage = 'Your pantry is empty. Add ingredients or try grocery shopping mode.'
+      emptyMessage = 'Your pantry is empty.'
     } else if (availableNames.size === 0) {
-      emptyMessage = 'Everything in your pantry is out of stock. Update availability or try grocery shopping mode.'
+      emptyMessage = 'All pantry ingredients are out of stock.'
     } else {
-      emptyMessage = 'None of your available ingredients match a recipe. Add ingredients or try grocery shopping mode.'
+      emptyMessage = 'No recipes match your pantry.'
     }
-  } else if (mode) {
-    emptyTitle = 'No recipes available'
-    emptyMessage = 'The recipe collection has no dishes to suggest.'
   }
 
   let suggestionStatus = ''
   if (currentMatch && eligibleMatches.length === 1) {
-    suggestionStatus = 'This is the only eligible dish for this mode.'
+    suggestionStatus = 'Only one dish available in this mode.'
   } else if (mode && eligibleMatches.length > 0 && !hasMore) {
-    suggestionStatus = 'You’ve seen every eligible dish in this round.'
+    suggestionStatus = 'You’ve seen all the recipes in this round.'
+  }
+
+  const showEmptyState = !currentMatch && (mode !== 'pantry' || eligibleMatches.length === 0)
+  let announcement = ''
+  if (currentMatch) {
+    announcement = `${currentMatch.recipe.name}. ${suggestionStatus}`
+  } else if (mode && showEmptyState) {
+    announcement = emptyMessage
   }
 
   return (
     <div className="home-layout">
       <section aria-labelledby="home-heading">
         <h1 id="home-heading">What should I <em>cook</em> today?</h1>
-        <p className="intro-text">
-          Choose a cooking mode to find a dish for today.
-        </p>
         <ul className="option-list">
           {cookingOptions.map((option) => (
             <li key={option.id}>
@@ -106,42 +103,53 @@ const Home = ({ ingredients, onOpenPantry }) => {
                 aria-pressed={mode === option.id}
                 onClick={() => handleSelectMode(option.id)}
               >
-                <span className="option-symbol" aria-hidden="true">{option.symbol}</span>
-                <span className="option-title">{option.title}</span>
-                <span className="option-description">{option.description}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d={option.icon} />
+                </svg>
+                <span>{option.title}</span>
               </button>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="suggestion-panel" aria-labelledby="suggestion-heading">
-        <h2 id="suggestion-heading">Today&rsquo;s Suggestion</h2>
-        <p className="suggestion-announcement" role="status">
-          {currentMatch ? `${currentMatch.recipe.name}. ${suggestionStatus}` : `${emptyTitle}. ${emptyMessage}`}
-        </p>
-        {currentMatch && <RecommendationCard match={currentMatch} mode={mode} />}
-        {!currentMatch && (mode !== 'pantry' || eligibleMatches.length === 0) && (
-          <div className="suggestion-empty">
-            <span className="empty-mark" aria-hidden="true">&#9832;</span>
-            <p className="empty-title">{emptyTitle}</p>
-            <p>{emptyMessage}</p>
-            {mode === 'pantry' && (
-              <button className="suggestion-action" type="button" onClick={onOpenPantry}>Open Pantry</button>
-            )}
-          </div>
-        )}
-        {suggestionStatus && <p className="suggestion-status">{suggestionStatus}</p>}
-        {mode && (eligibleMatches.length > 1 || (!currentMatch && hasMore)) && (
-          <button
-            className="suggestion-action"
-            type="button"
-            onClick={hasMore ? handleNextSuggestion : handleRestart}
-          >
-            {hasMore ? 'Suggest another dish' : 'Restart suggestions'}
-          </button>
-        )}
-      </section>
+      <p className="visually-hidden" role="status">{announcement}</p>
+      {!mode && (
+        <div className="suggestion-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 10h18M7 10V8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M12 6V4m-7 6v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-6M2 13h3m14 0h3" />
+          </svg>
+          <p>What's cooking?</p>
+        </div>
+      )}
+      {mode && (
+        <div className="suggestion-panel">
+          {currentMatch && <RecommendationCard match={currentMatch} />}
+          {showEmptyState && (
+            <div className="suggestion-empty">
+              <p>{emptyMessage}</p>
+              {mode === 'pantry' && (
+                <div className="pantry-actions">
+                  <button className="pantry-button" type="button" onClick={onOpenPantry}>Open Pantry</button>
+                  <button className="pantry-button" type="button" onClick={() => handleSelectMode('shopping')}>
+                    Try grocery mode
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {suggestionStatus && <p className="suggestion-status">{suggestionStatus}</p>}
+          {(eligibleMatches.length > 1 || (!currentMatch && hasMore)) && (
+            <button
+              className="pantry-button pantry-primary suggestion-action"
+              type="button"
+              onClick={hasMore ? handleNextSuggestion : handleRestart}
+            >
+              {hasMore ? 'Suggest another' : 'Restart suggestions'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

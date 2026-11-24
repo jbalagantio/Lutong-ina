@@ -24,7 +24,7 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
       return
     }
     if (wouldDuplicateIngredient(trimmedName, ingredients, ingredient)) {
-      setError('That ingredient is already in your pantry under this name or an equivalent name.')
+      setError('That ingredient is already in your pantry.')
       return
     }
 
@@ -44,7 +44,7 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
 
   return (
     <form className="pantry-form" aria-labelledby="ingredient-form-heading" onSubmit={handleSubmit}>
-      <h2 id="ingredient-form-heading">{ingredient ? 'Edit ingredient' : 'Add an ingredient'}</h2>
+      <h2 id="ingredient-form-heading">{ingredient ? 'Edit ingredient' : 'Add ingredient'}</h2>
       <div className="pantry-fields">
         <label>
           Ingredient name
@@ -71,7 +71,7 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
       {error && <p className="pantry-error" role="alert">{error}</p>}
       <div className="pantry-actions">
         <button className="pantry-button pantry-primary" type="submit">
-          {ingredient ? 'Save changes' : 'Add ingredient'}
+          {ingredient ? 'Save changes' : 'Add'}
         </button>
         <button className="pantry-button" type="button" onClick={onCancel}>Cancel</button>
       </div>
