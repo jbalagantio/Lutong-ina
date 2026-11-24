@@ -278,6 +278,8 @@ h1 {
   font-size: 0.875rem;
 }
 
+.discover-controls input,
+.discover-controls select,
 .pantry-fields input,
 .pantry-fields select,
 .recipe-form input,
@@ -292,6 +294,7 @@ h1 {
   color: var(--cream);
 }
 
+.discover-search input::placeholder,
 .pantry-fields input::placeholder {
   color: var(--muted);
   opacity: 1;
@@ -752,10 +755,85 @@ h1 {
   aspect-ratio: 4 / 3;
 }
 
-.discover-count {
-  margin-block: 0.75rem 1.25rem;
+.discover-controls {
+  display: grid;
+  gap: 0.55rem;
+  max-width: 48rem;
+  margin-top: 1.25rem;
+}
+
+.discover-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.discover-search input {
+  min-width: 0;
+}
+
+.discover-search button {
+  flex: none;
+}
+
+.discover-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.discover-filters {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.discover-filters label {
+  min-width: 0;
+}
+
+.discover-results-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin-block: 0.6rem 0.85rem;
+}
+
+.discover-count,
+.discover-empty p {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.discover-empty h2 {
+  font-size: 1.4rem;
+}
+
+.discover-empty p {
+  margin-top: 0.35rem;
+}
+
+@media (min-width: 24rem) {
+  .discover-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .discover-filters select {
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 36rem) {
+  .discover-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .discover-controls {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    max-width: 58rem;
+  }
 }
 
 .discover-grid {
