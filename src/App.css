@@ -275,7 +275,10 @@ h1 {
 
 .search-field input,
 .pantry-fields input,
-.pantry-fields select {
+.pantry-fields select,
+.recipe-form input,
+.recipe-form select,
+.recipe-form textarea {
   width: 100%;
   min-height: 2.75rem;
   padding: 0.45rem 0.65rem;
@@ -475,6 +478,136 @@ h1 {
   color: var(--cream);
 }
 
+.my-dishes {
+  max-width: 55rem;
+}
+
+.dishes-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.dishes-warning,
+.dishes-empty,
+.recipe-form,
+.dishes-list {
+  margin-top: 1rem;
+}
+
+.dishes-empty,
+.recipe-cuisine {
+  color: var(--muted);
+}
+
+.dishes-list {
+  padding: 0;
+  margin-bottom: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.personal-recipe {
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.personal-recipe-summary {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.personal-recipe-summary h2,
+.recipe-form h2 {
+  font-size: 1.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.personal-recipe-details {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.personal-recipe-details h3 {
+  margin-top: 0.4rem;
+  font-size: 1rem;
+}
+
+.personal-recipe-details ul,
+.personal-recipe-details ol {
+  margin: 0;
+  padding-inline-start: 1.3rem;
+}
+
+.personal-recipe-details li {
+  margin-bottom: 0.3rem;
+}
+
+.recipe-form {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.recipe-form label,
+.recipe-fields,
+.recipe-ingredient-row,
+.recipe-step-row {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.recipe-form label {
+  font-size: 0.875rem;
+}
+
+.recipe-form textarea {
+  resize: vertical;
+  font: inherit;
+}
+
+.recipe-form-group {
+  min-width: 0;
+  padding: 0.5rem 0 0;
+  margin: 0;
+  border: 0;
+}
+
+.recipe-form-group legend {
+  padding: 0;
+  font-weight: 650;
+}
+
+.recipe-ingredient-row,
+.recipe-step-row {
+  margin-bottom: 0.65rem;
+}
+
+.recipe-ingredient-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.recipe-ingredient-row label:first-child {
+  grid-column: 1 / -1;
+}
+
+.recipe-ingredient-row button,
+.recipe-step-row button {
+  justify-self: start;
+}
+
+.recipe-form button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 @media (min-width: 40rem) {
   .app-bar {
     display: flex;
@@ -515,6 +648,28 @@ h1 {
 
   .pantry-filters {
     grid-template-columns: 2fr repeat(2, minmax(0, 1fr));
+  }
+
+  .recipe-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .recipe-description {
+    grid-column: 1 / -1;
+  }
+
+  .recipe-ingredient-row {
+    grid-template-columns: 2fr minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .recipe-ingredient-row label:first-child {
+    grid-column: auto;
+  }
+
+  .recipe-step-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
   }
 }
 

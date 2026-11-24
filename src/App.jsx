@@ -6,6 +6,7 @@ import MyDishes from './components/MyDishes.jsx'
 import Pantry from './components/Pantry.jsx'
 import Discover from './components/Discover.jsx'
 import recipes from './data/recipes.js'
+import { loadMyDishes, mergeRecoveredPersonalRecipes, preparePersonalRecipe, saveMyDishes } from './utils/myDishes.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -27,8 +28,10 @@ const storageWarnings = {
 const App = () => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [pantry, setPantry] = useState(loadPantry)
+  const [myDishes, setMyDishes] = useState(loadMyDishes)
   const [recommendationSession, setRecommendationSession] = useState({ mode: null, rounds: {} })
   const latestPantry = useRef(pantry)
+  const latestDishes = useRef(myDishes)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
 
@@ -129,6 +132,70 @@ const App = () => {
     )
   }
 
+  const commitMyDishes = (nextDishes) => {
+    latestDishes.current = nextDishes
+    setMyDishes(nextDishes)
+  }
+
+  const saveAndCommitMyDishes = (nextDishes) => {
+    const storageStatus = saveMyDishes(nextDishes)
+    commitMyDishes({ ...nextDishes, storageStatus })
+  }
+
+  const handleSavePersonalRecipe = (values, editingId) => {
+    const current = latestDishes.current
+    const { recipe, error } = preparePersonalRecipe(values, current.personalRecipes, editingId)
+    if (error) {
+      return error
+    }
+
+    const personalRecipes = editingId
+      ? current.personalRecipes.map((item) => item.id === editingId ? recipe : item)
+      : [...current.personalRecipes, recipe]
+    saveAndCommitMyDishes({ ...current, personalRecipes })
+    return ''
+  }
+
+  const handleDeletePersonalRecipe = (id) => {
+    const current = latestDishes.current
+    const personalRecipes = current.personalRecipes.filter((recipe) => recipe.id !== id)
+    saveAndCommitMyDishes({ ...current, personalRecipes })
+  }
+
+  const handleRetryDishes = () => {
+    const current = latestDishes.current
+    if (current.storageStatus !== 'read-failed') {
+      saveAndCommitMyDishes(current)
+      return
+    }
+
+    const recovered = loadMyDishes()
+    if (recovered.storageStatus === 'read-failed') {
+      return
+    }
+    if (current.personalRecipes.length === 0) {
+      commitMyDishes(recovered)
+      return
+    }
+
+    const personalRecipes = mergeRecoveredPersonalRecipes(recovered.personalRecipes, current.personalRecipes)
+    saveAndCommitMyDishes({ ...recovered, personalRecipes })
+  }
+
+  const handleReplaceSavedDishes = () => {
+    if (!window.confirm('Replace the saved My Dishes data with the recovered and current recipes? Unreadable entries will be lost.')) {
+      return
+    }
+
+    const current = latestDishes.current
+    const storageStatus = saveMyDishes({ ...current, storageStatus: 'ready' })
+    if (storageStatus === 'ready') {
+      commitMyDishes({ ...current, storageStatus, replacementError: undefined })
+    } else {
+      commitMyDishes({ ...current, replacementError: storageStatus })
+    }
+  }
+
   const handleNavigate = (screen) => {
     if (screen === 'home') {
       const matches = getRecipeMatches(recipes, latestPantry.current.ingredients)
@@ -153,7 +220,17 @@ const App = () => {
 
   let screen
   if (activeScreen === 'my-dishes') {
-    screen = <MyDishes />
+    screen = (
+      <MyDishes
+        personalRecipes={myDishes.personalRecipes}
+        storageStatus={myDishes.storageStatus}
+        replacementError={myDishes.replacementError}
+        onSaveRecipe={handleSavePersonalRecipe}
+        onDeleteRecipe={handleDeletePersonalRecipe}
+        onRetryStorage={handleRetryDishes}
+        onReplaceStorage={handleReplaceSavedDishes}
+      />
+    )
   } else if (activeScreen === 'pantry') {
     screen = (
       <Pantry
