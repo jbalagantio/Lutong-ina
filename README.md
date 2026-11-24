@@ -1,16 +1,22 @@
-# React + Vite
+# Lutong Ina
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Lutong Ina is a personal cooking decision companion. Phase 1 establishes its React application foundation.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+With Node.js and npm installed, run:
 
-## React Compiler
+```sh
+npm ci
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Run `npm run lint` to check the source and `npm run build` to create the production build.
 
-## Expanding the ESLint configuration
+## Phase 1
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Home, My Dishes, Pantry, and Discover are available through the main navigation. Home shows three planned cooking modes and an empty suggestion panel. The recommendation controls and Discover search are visible and disabled. My Dishes and Pantry explain their current availability.
+
+The active screen is held in React state and resets to Home on reload. Recipe data, recommendation rules, and localStorage persistence are planned for later phases.
+
+Codex assisted with the React components, CSS, starter cleanup, and verification.
