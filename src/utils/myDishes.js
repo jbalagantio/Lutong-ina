@@ -264,7 +264,7 @@ export const mergeRecoveredPersonalRecipes = (savedRecipes, sessionRecipes) => {
 
 const emptyDishes = (storageStatus) => ({ personalRecipes: [], libraryEntries: [], storageStatus })
 
-export const loadMyDishes = () => {
+export const loadMyDishes = ({ requireSnapshot = false } = {}) => {
   let raw
   try {
     raw = localStorage.getItem(storageKey)
@@ -272,7 +272,7 @@ export const loadMyDishes = () => {
     return emptyDishes('read-failed')
   }
   if (raw === null) {
-    return emptyDishes('ready')
+    return requireSnapshot ? null : emptyDishes('ready')
   }
 
   let saved

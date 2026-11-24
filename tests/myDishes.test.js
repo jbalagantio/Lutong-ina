@@ -123,6 +123,9 @@ test('loads valid and recoverable entries without writing or discarding library 
     return stored
   }, setItem })
   assert.deepEqual(loadMyDishes(), { personalRecipes: [], libraryEntries: [], storageStatus: 'ready' })
+  assert.equal(loadMyDishes({ requireSnapshot: true }), null)
+  stored = JSON.stringify({ personalRecipes: [], libraryEntries: [] })
+  assert.equal(loadMyDishes({ requireSnapshot: true }).storageStatus, 'ready')
   for (const raw of ['{broken', '[]', 'null', '{}']) {
     stored = raw
     assert.equal(loadMyDishes().storageStatus, 'invalid')

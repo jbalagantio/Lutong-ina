@@ -27,6 +27,7 @@ const RecipeForm = ({ recipe, onSave, onCancel, onDraftChange }) => {
   const [isReadingPhoto, setIsReadingPhoto] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const photoSelection = useRef(0)
+  const submitting = useRef(false)
   const photoInput = useRef(null)
   const saveError = useRef(null)
   const nextRowId = useRef(0)
@@ -131,13 +132,16 @@ const RecipeForm = ({ recipe, onSave, onCancel, onDraftChange }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (isSaving || isReadingPhoto || photoError) return
+    if (submitting.current || isReadingPhoto || photoError) return
     const values = { ...draft, instructions: draft.instructions.map((step) => step.text) }
+    submitting.current = true
     setIsSaving(true)
-    const validationError = await onSave(values, draftPhoto)
-    setIsSaving(false)
-    if (validationError) {
-      setError(validationError)
+    try {
+      const validationError = await onSave(values, draftPhoto)
+      if (validationError) setError(validationError)
+    } finally {
+      submitting.current = false
+      setIsSaving(false)
     }
   }
 

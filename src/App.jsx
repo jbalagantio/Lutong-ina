@@ -19,7 +19,7 @@ import {
   saveMyDishes,
   toggleRecipePreference,
 } from './utils/myDishes.js'
-import { deleteRecipePhoto, getUnusedPhotoIds, saveRecipePhoto } from './utils/recipePhotos.js'
+import { reconcileRecipePhotos, saveRecipePhoto } from './utils/recipePhotos.js'
 import { loadPantry, savePantry } from './utils/pantry.js'
 import {
   advanceRecommendationSession,
@@ -47,7 +47,7 @@ const getDishesMatches = (ingredients, dishes) => {
   return getRecipeMatches(catalog, ingredients)
 }
 
-const App = () => {
+const App = ({ canReconcilePhotos }) => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [pantry, setPantry] = useState(loadPantry)
   const [myDishes, setMyDishes] = useState(loadMyDishes)
@@ -57,7 +57,6 @@ const App = () => {
   const pendingLibraryChanges = useRef(new Map())
   const recipeDraftChanged = useRef(false)
   const savingPhoto = useRef(false)
-  const photosToDelete = useRef(new Set())
   const [photoCleanupError, setPhotoCleanupError] = useState(false)
   const storageWarning = storageWarnings[pantry.storageStatus]
   const needsReplacement = pantry.storageStatus === 'invalid' || pantry.storageStatus === 'partial'
@@ -170,24 +169,24 @@ const App = () => {
     }
   }
 
-  const cleanUpPhotos = async (personalRecipes) => {
-    const unused = getUnusedPhotoIds(photosToDelete.current, personalRecipes)
-    for (const photoId of unused) {
-      try {
-        await deleteRecipePhoto(photoId)
-        photosToDelete.current.delete(photoId)
-      } catch {
-        // Keep this ID queued so the user can retry cleanup.
-      }
+  const cleanUpPhotos = async () => {
+    if (!canReconcilePhotos || latestDishes.current.storageStatus !== 'ready') return
+    try {
+      const checked = await reconcileRecipePhotos(
+        () => loadMyDishes({ requireSnapshot: true }),
+        () => savingPhoto.current ? null : latestDishes.current,
+      )
+      if (checked) setPhotoCleanupError(false)
+    } catch {
+      setPhotoCleanupError(true)
     }
-    setPhotoCleanupError(getUnusedPhotoIds(photosToDelete.current, latestDishes.current.personalRecipes).length > 0)
   }
 
   const saveAndCommitMyDishes = (nextDishes, remappedRecipes) => {
     const storageStatus = saveMyDishes(nextDishes)
     const replacementError = storageStatus === 'ready' ? undefined : nextDishes.replacementError
     commitMyDishes({ ...nextDishes, storageStatus, replacementError }, remappedRecipes)
-    if (storageStatus === 'ready') void cleanUpPhotos(nextDishes.personalRecipes)
+    if (storageStatus === 'ready') void cleanUpPhotos()
     return storageStatus
   }
 
@@ -216,11 +215,7 @@ const App = () => {
       photoId = undefined
     }
     if (photoId) recipe.photoId = photoId
-    if (editingRecipe?.photoId && editingRecipe.photoId !== photoId) {
-      photosToDelete.current.add(editingRecipe.photoId)
-    }
-
-    // A new photo uses a fresh key. The previous blob is kept until the recipe write succeeds.
+    // Reconciliation keeps the previous blob while the saved recipe still references it.
     const latest = latestDishes.current
     const personalRecipes = editingId
       ? latest.personalRecipes.map((item) => item.id === editingId ? recipe : item)
@@ -236,7 +231,6 @@ const App = () => {
     if (next === current) {
       return false
     }
-    if (recipe.photoId) photosToDelete.current.add(recipe.photoId)
     pendingLibraryChanges.current.delete(recipe.id)
     saveAndCommitMyDishes(next)
     return true
@@ -297,6 +291,7 @@ const App = () => {
     const changes = pendingLibraryChanges.current
     if (current.personalRecipes.length === 0 && changes.size === 0) {
       commitMyDishes(recovered)
+      void cleanUpPhotos()
       return { status: recovered.storageStatus, remappedRecipes: new Map() }
     }
 
@@ -329,7 +324,7 @@ const App = () => {
     const storageStatus = saveMyDishes({ ...current, storageStatus: 'ready' })
     if (storageStatus === 'ready') {
       commitMyDishes({ ...current, storageStatus, replacementError: undefined })
-      void cleanUpPhotos(current.personalRecipes)
+      void cleanUpPhotos()
     } else {
       commitMyDishes({ ...current, replacementError: storageStatus })
     }
@@ -360,6 +355,7 @@ const App = () => {
       ))
     }
     setActiveScreen(screen)
+    if (screen === 'my-dishes') void cleanUpPhotos()
   }
 
   const handleSelectMode = (mode) => {
@@ -388,7 +384,7 @@ const App = () => {
         replacementError={myDishes.replacementError}
         photoCleanupError={photoCleanupError}
         onRetryPhotoCleanup={myDishes.storageStatus === 'ready'
-          ? () => cleanUpPhotos(latestDishes.current.personalRecipes)
+          ? cleanUpPhotos
           : undefined}
         onSaveRecipe={handleSavePersonalRecipe}
         onDeleteRecipe={handleDeletePersonalRecipe}

@@ -47,23 +47,35 @@ export const prepareRecipePhoto = async (file) => {
   }
 }
 
-const openPhotoStore = () => new Promise((resolve, reject) => {
+const openPhotoStore = (create) => new Promise((resolve, reject) => {
   const request = indexedDB.open('lutong-ina-photos', 1)
   let blocked = false
+  let missing = false
   request.onblocked = () => {
     blocked = true
     reject(new Error('Photo storage is open in another tab.'))
   }
-  request.onupgradeneeded = () => request.result.createObjectStore('photos')
+  request.onupgradeneeded = () => {
+    if (create) {
+      request.result.createObjectStore('photos')
+    } else {
+      missing = true
+      request.transaction.abort()
+    }
+  }
   request.onsuccess = () => {
     if (blocked) request.result.close()
     else resolve(request.result)
   }
-  request.onerror = () => reject(request.error)
+  request.onerror = () => {
+    if (missing) resolve(null)
+    else reject(request.error)
+  }
 })
 
-const accessPhotos = async (mode, operation) => {
-  const database = await openPhotoStore()
+const accessPhotos = async (mode, operation, create = true) => {
+  const database = await openPhotoStore(create)
+  if (!database) return
   try {
     return await new Promise((resolve, reject) => {
       const transaction = database.transaction('photos', mode)
@@ -78,9 +90,55 @@ const accessPhotos = async (mode, operation) => {
 
 export const loadRecipePhoto = (photoId) => accessPhotos('readonly', (store) => store.get(photoId))
 export const saveRecipePhoto = (photoId, blob) => accessPhotos('readwrite', (store) => store.add(blob, photoId))
-export const deleteRecipePhoto = (photoId) => accessPhotos('readwrite', (store) => store.delete(photoId))
 
 export const getUnusedPhotoIds = (photoIds, recipes) => {
   const usedPhotoIds = new Set(recipes.map((recipe) => recipe.photoId))
   return [...photoIds].filter((photoId) => !usedPhotoIds.has(photoId))
 }
+
+export const getOrphanedPhotoIds = (photoIds, savedDishes, activeDishes) => {
+  if (savedDishes?.storageStatus !== 'ready' || activeDishes?.storageStatus !== 'ready') {
+    return []
+  }
+  const recipes = [...savedDishes.personalRecipes, ...activeDishes.personalRecipes]
+  return getUnusedPhotoIds(photoIds, recipes).filter((photoId) => typeof photoId === 'string')
+}
+
+const photoSessionGate = 'lutong-ina-photo-session-gate'
+const openPhotoSessions = 'lutong-ina-open-photo-sessions'
+
+export const registerPhotoSession = async () => {
+  const locks = navigator.locks
+  if (!locks) return false
+
+  // Register before reading recipes. The browser releases this shared lock when the document closes.
+  return locks.request(photoSessionGate, () => new Promise((resolve) => {
+    locks.request(openPhotoSessions, { mode: 'shared' }, () => {
+      resolve(true)
+      return new Promise(() => {})
+    }).catch(() => resolve(false))
+  })).catch(() => false)
+}
+
+export const reconcileRecipePhotos = (readSavedDishes, readActiveDishes) =>
+  navigator.locks.request(photoSessionGate, async () => {
+    // While the gate is held, another tab cannot register and read recipes.
+    const { held } = await navigator.locks.query()
+    if (held.filter((lock) => lock.name === openPhotoSessions).length !== 1) return false
+    if (readActiveDishes()?.storageStatus !== 'ready' || readSavedDishes()?.storageStatus !== 'ready') return false
+
+    let checked = false
+    const photoKeys = await accessPhotos('readwrite', (store) => {
+      const keys = store.getAllKeys()
+      keys.onsuccess = () => {
+        // Read both snapshots again immediately before issuing deletes.
+        const savedDishes = readSavedDishes()
+        const activeDishes = readActiveDishes()
+        checked = savedDishes?.storageStatus === 'ready' && activeDishes?.storageStatus === 'ready'
+        const unused = getOrphanedPhotoIds(keys.result, savedDishes, activeDishes)
+        for (const photoId of unused) store.delete(photoId)
+      }
+      return keys
+    }, false)
+    return checked || photoKeys === undefined
+  })

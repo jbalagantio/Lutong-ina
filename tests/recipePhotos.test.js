@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import recipes from '../src/data/recipes.js'
 import { recipeImages } from '../src/data/recipeImages.js'
 import { mergeRecoveredPersonalRecipes } from '../src/utils/myDishes.js'
-import { getPhotoFileError, getPhotoType, getUnusedPhotoIds, photoSizeLimit } from '../src/utils/recipePhotos.js'
+import { getOrphanedPhotoIds, getPhotoFileError, getPhotoType, getUnusedPhotoIds, photoSizeLimit } from '../src/utils/recipePhotos.js'
 
 test('external photos have HTTPS sources and credits and remain optional', () => {
   const recipeIds = new Set(recipes.map((recipe) => recipe.id))
@@ -47,4 +47,24 @@ test('recipe ID recovery keeps each photo associated with its own recipe', () =>
   assert.notEqual(remapped.id, recovered.id)
   assert.equal(remapped.photoId, session.photoId)
   assert.deepEqual(getUnusedPhotoIds(new Set([saved.photoId, session.photoId]), [recovered, remapped]), [])
+})
+
+test('photo reconciliation retains references from both saved and active recipes', () => {
+  const saved = { storageStatus: 'ready', personalRecipes: [{ photoId: 'saved-only' }] }
+  const active = { storageStatus: 'ready', personalRecipes: [{ photoId: 'session-only' }] }
+  const keys = ['saved-only', 'session-only', 'orphan', 123]
+  assert.deepEqual(getOrphanedPhotoIds(keys, saved, active), ['orphan'])
+})
+
+test('photo reconciliation requires ready storage and a saved snapshot', () => {
+  const ready = { storageStatus: 'ready', personalRecipes: [] }
+  const keys = ['photo']
+  assert.deepEqual(getOrphanedPhotoIds(keys, null, ready), [])
+  assert.deepEqual(getOrphanedPhotoIds(keys, ready, null), [])
+  for (const storageStatus of ['read-failed', 'invalid', 'partial', 'duplicate-names', 'write-failed', 'quota-exceeded']) {
+    const protectedDishes = { ...ready, storageStatus }
+    assert.deepEqual(getOrphanedPhotoIds(keys, protectedDishes, ready), [])
+    assert.deepEqual(getOrphanedPhotoIds(keys, ready, protectedDishes), [])
+  }
+  assert.deepEqual(getOrphanedPhotoIds(keys, ready, ready), ['photo'])
 })
