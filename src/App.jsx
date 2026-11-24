@@ -430,6 +430,7 @@ const App = ({ canReconcilePhotos }) => {
         pantryIngredients={pantry.ingredients}
         libraryEntries={myDishes.libraryEntries}
         libraryStorageStatus={myDishes.storageStatus}
+        onOpenMyDishes={(event) => handleNavigate('my-dishes', event.currentTarget)}
         onBuiltInRecipe={handleBuiltInRecipe}
         onRecipePreference={handleRecipePreference}
       />

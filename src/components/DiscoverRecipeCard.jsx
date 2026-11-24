@@ -4,7 +4,7 @@ import RecipeImage, { RecipeImageCredit } from './RecipeImage.jsx'
 
 const DiscoverRecipeCard = ({ match, isSaved, onOpen, onToggleSaved }) => {
   const { recipe } = match
-  const saveLabel = isSaved ? `Remove ${recipe.name} from My Dishes` : `Save ${recipe.name} to My Dishes`
+  const bookmarkLabel = `Bookmark ${recipe.name}`
 
   return (
     <article className="discover-recipe">
@@ -17,7 +17,7 @@ const DiscoverRecipeCard = ({ match, isSaved, onOpen, onToggleSaved }) => {
           </button>
         </h2>
         <button className="icon-button dish-preference discover-bookmark" type="button"
-          aria-label={saveLabel} aria-pressed={isSaved} title={saveLabel}
+          aria-label={bookmarkLabel} aria-pressed={isSaved} title={bookmarkLabel}
           onClick={() => onToggleSaved(recipe.id, !isSaved)}>
           <svg viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 4h12v16l-6-4-6 4z" />
