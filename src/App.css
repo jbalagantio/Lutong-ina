@@ -134,6 +134,16 @@ h1 em {
   color: inherit;
   opacity: 1;
   text-align: left;
+  cursor: pointer;
+}
+
+.option-card:hover,
+.option-card[aria-pressed='true'] {
+  border-color: var(--orange);
+}
+
+.option-card[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--orange);
 }
 
 .option-pantry {
@@ -187,10 +197,113 @@ h1 em {
 .suggestion-panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .suggestion-panel h2 {
   font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.suggestion-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.recommendation-card {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: #131814;
+  overflow-wrap: anywhere;
+}
+
+.recommendation-card h3,
+.recommendation-card h4 {
+  margin: 0;
+}
+
+.recommendation-card h3 {
+  font: bold 1.65rem/1.15 var(--heading-font);
+}
+
+.recommendation-card p,
+.suggestion-status {
+  color: var(--muted);
+}
+
+.recipe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipe-meta li {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+}
+
+.recommendation-match {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.recommendation-match strong {
+  color: var(--orange);
+}
+
+.recommendation-ingredients {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.recommendation-ingredients > div:first-child h4 {
+  color: var(--green);
+}
+
+.recommendation-ingredients ul {
+  margin: 0.25rem 0 0;
+  padding-inline-start: 1.25rem;
+}
+
+.suggestion-action {
+  min-height: 2.75rem;
+  margin-top: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--orange);
+  border-radius: 0.65rem;
+  background: var(--orange);
+  color: #22160e;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.suggestion-action:hover {
+  background: #ffb685;
+}
+
+.suggestion-status {
+  margin-top: 0.85rem;
+}
+
+.storage-warning {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--orange);
+  border-radius: 0.65rem;
+  background: #2c231b;
 }
 
 .suggestion-empty {

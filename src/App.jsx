@@ -11,15 +11,20 @@ import './App.css'
 const App = () => {
   const [activeScreen, setActiveScreen] = useState('home')
   const [pantry, setPantry] = useState(loadPantry)
+  const [storageWarning, setStorageWarning] = useState(pantry.loadWarning)
 
   useEffect(() => {
-    if (pantry.hasChanges) {
-      savePantry(pantry.ingredients)
+    if (pantry.hasChanges && pantry.canSave) {
+      const saved = savePantry(pantry.ingredients)
+      queueMicrotask(() => {
+        setStorageWarning(saved ? '' : 'Your pantry could not be saved. Changes may be lost when you leave or refresh.')
+      })
     }
   }, [pantry])
 
   const updatePantry = (updateIngredients) => {
     setPantry((currentPantry) => ({
+      ...currentPantry,
       ingredients: updateIngredients(currentPantry.ingredients),
       hasChanges: true,
     }))
@@ -60,7 +65,7 @@ const App = () => {
     setActiveScreen(screen)
   }
 
-  let screen = <Home />
+  let screen = <Home ingredients={pantry.ingredients} onOpenPantry={() => handleNavigate('pantry')} />
 
   if (activeScreen === 'my-dishes') {
     screen = <MyDishes />
@@ -85,6 +90,7 @@ const App = () => {
         <Navigation activeScreen={activeScreen} onNavigate={handleNavigate} />
       </div>
       <main className="main-content">
+        {storageWarning && <p className="storage-warning" role="alert">{storageWarning}</p>}
         {screen}
       </main>
     </div>

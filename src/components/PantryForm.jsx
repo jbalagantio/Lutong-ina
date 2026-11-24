@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { normalizeIngredientName, pantryCategories, pantryNameLimit } from '../utils/pantry.js'
+import { getIngredientMatchName, pantryCategories, pantryNameLimit } from '../utils/pantry.js'
 
 const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
   const [name, setName] = useState(ingredient?.name ?? '')
@@ -10,9 +10,10 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
   const handleSubmit = (event) => {
     event.preventDefault()
     const trimmedName = name.trim()
-    const normalizedName = normalizeIngredientName(name)
+    const matchName = getIngredientMatchName(name)
+    const originalMatchName = ingredient ? getIngredientMatchName(ingredient.name) : null
     const isDuplicate = ingredients.some((item) =>
-      item.id !== ingredient?.id && normalizeIngredientName(item.name) === normalizedName,
+      item.id !== ingredient?.id && getIngredientMatchName(item.name) === matchName,
     )
 
     if (!trimmedName) {
@@ -27,8 +28,8 @@ const PantryForm = ({ ingredient, ingredients, onSave, onCancel }) => {
       setError('Select a valid category.')
       return
     }
-    if (isDuplicate) {
-      setError('An ingredient with that name already exists.')
+    if (isDuplicate && matchName !== originalMatchName) {
+      setError('That ingredient is already in your pantry under this name or an equivalent name.')
       return
     }
 
