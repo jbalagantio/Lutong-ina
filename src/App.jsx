@@ -135,6 +135,16 @@ const App = ({ canReconcilePhotos }) => {
     }
   }
 
+  const handlePantryStorageAction = (action) => {
+    const previousStatus = latestPantry.current.storageStatus
+    action()
+    const currentStatus = latestPantry.current.storageStatus
+    const replaceNeeded = currentStatus === 'invalid' || currentStatus === 'partial'
+    if (currentStatus === 'ready' || (previousStatus === 'read-failed' && replaceNeeded)) {
+      mainContent.current?.querySelector('h1')?.focus()
+    }
+  }
+
   const handleAddIngredient = (values) => {
     const ingredient = { ...values, id: crypto.randomUUID() }
     updatePantry((ingredients) => [...ingredients, ingredient])
@@ -451,11 +461,11 @@ const App = ({ canReconcilePhotos }) => {
               {needsReplacement ? ' Changes stay in memory until you replace the saved pantry.' : ' Changes stay in memory until saved.'}
             </p>
             {needsReplacement ? (
-              <button className="pantry-button" type="button" onClick={handleReplaceSavedPantry}>
+              <button className="pantry-button" type="button" onClick={() => handlePantryStorageAction(handleReplaceSavedPantry)}>
                 Replace saved pantry
               </button>
             ) : (
-              <button className="pantry-button" type="button" onClick={handleRetryStorage}>
+              <button className="pantry-button" type="button" onClick={() => handlePantryStorageAction(handleRetryStorage)}>
                 {pantry.storageStatus === 'read-failed' ? 'Retry loading' : 'Retry saving'}
               </button>
             )}

@@ -19,7 +19,7 @@ Use **My Dishes** to create, search, expand, edit, and delete personal recipes. 
 
 My Dishes uses separate browser storage from Pantry. Library entries store recipe IDs and preferences. Removing a saved recipe or deleting a personal one removes its preferences. After a storage read failure, explicit session changes take precedence, including turning off a preference or removing a recipe. Untouched preferences are recovered from storage. Removing and saving the same recipe again starts its preferences fresh. If a personal recipe ID is reassigned, its session preferences follow the new ID. Duplicate entries already in storage retain enabled flags from either copy and require replacement confirmation along with other partially recovered data.
 
-Personal recipe photos are optional. Choose a JPEG, PNG, or WebP up to 10 MB. Photos stay in this browser in IndexedDB. Recipe details and library preferences stay in localStorage. Built-in photos load from Wikimedia Commons and fall back to a placeholder when unavailable. See [photo credits](IMAGE_CREDITS.md).
+Personal recipe photos are optional. Choose a JPEG, PNG, or WebP up to 10 MB. Photos stay in this browser in IndexedDB. Recipe details and library preferences stay in localStorage. Built-in photos load from Wikimedia Commons and fall back to a placeholder when unavailable. Unused photo cleanup requires Web Locks, valid saved recipe data, and a single open Lutong Ina tab. When cleanup is deferred, the app keeps the photo files. See [photo credits](IMAGE_CREDITS.md).
 
 Open **Pantry** to add, edit, remove, and mark ingredients as available or out of stock. Search by name and combine category and availability filters. Pantry data is stored locally in the current browser when localStorage is available. The first pantry starts empty.
 
@@ -32,6 +32,8 @@ Choose one of three cooking modes on **Home**:
 Home recommendations include all built-in and personal recipes. Matches use available pantry entries, an explicit list of equivalent names, and distinct tracked ingredients. Water is excluded from matching. The app checks presence only. Each cooking mode keeps its own suggestion round while you navigate. Refreshing starts a new session. If a suggestion becomes ineligible, the app moves to an eligible unseen recipe when one exists. Pantry data stays in this browser, and the app shows a warning if storage fails.
 
 Pantry search accepts partial names in both English and Filipino when an explicit equivalent exists. For example, searching `kang` finds `Water spinach`, and searching `water spinach` finds an entry saved as `Kangkong`. Search still respects the selected category and availability. Duplicate validation uses the same equivalents as recommendations, while existing entries keep their saved names and availability.
+
+**Discover** displays a placeholder. Recipe search is coming soon.
 
 Run `node --test` to verify recipe and photo utilities, ingredient matching, pantry utilities, and recommendation rules.
 
