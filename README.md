@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Run `npm run lint` to check the source and `npm run build` to create the production build.
+Run `npm run lint` to check the source and `npm run build` to create the production build in `dist/`. Use `npm run preview` to check that build locally.
 
 ## Current features
 
@@ -41,7 +41,7 @@ Open **My Dishes → Cooking History** to search name snapshots and remove indiv
 
 History stays in this browser under `lutong-ina-cooking-history`. A failed read can be retried, merging readable saved records with current-session events. Invalid or partial storage requires confirmed replacement. Unsaved events may be lost on refresh. Cooking records for new personal recipes stay in memory until My Dishes saves their resolved IDs successfully. A later history write failure appears as a general warning and does not change the confirmation for a previously saved event.
 
-The 30 built-in Filipino recipes include preparation, cooking order, approximate timings, and doneness cues. All have a primary photo. Where an additional licensed photo is available, Discover details and expanded recipes in My Dishes offer thumbnails with individual credits. Images that fail to load use the cooking-pot placeholder. Discover search can also match a broader ingredient term such as `manok` for chicken leg quarters, while Pantry matching still requires the specific ingredient. V1 runs as a standalone React app with browser-local storage. AI integration, a backend, accounts, and cloud sync are deferred to V2.
+The 30 built-in Filipino recipes include preparation, cooking order, approximate timings, and doneness cues. The catalog has 30 primary photos and 13 secondary photos. For the 11 recipes with galleries, Discover details and expanded recipes in My Dishes offer thumbnails with individual credits. Images that fail to load use the cooking-pot placeholder. Discover search can also match a broader ingredient term such as `manok` for chicken leg quarters, while Pantry matching still requires the specific ingredient. V1 runs as a standalone React app with browser-local storage. AI integration, a backend, accounts, and cloud sync are deferred to V2.
 
 Choose one of three cooking modes on **Home**:
 
