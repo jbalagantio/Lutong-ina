@@ -19,7 +19,7 @@ test('search matches partial recipe names independent of case and whitespace', (
 
 test('ingredient search uses partial English names and Filipino and English synonyms', () => {
   for (const [query, equivalent] of [
-    ['manok', 'chicken'],
+    ['bangus', 'milkfish'],
     ['talon', 'eggplant'],
     ['toyo', 'soy sauce'],
     ['bawang', 'garlic'],
@@ -34,6 +34,10 @@ test('ingredient search uses partial English names and Filipino and English syno
     filterDiscoverRecipes(recipes, { query: ' WATER    SPINACH ' }),
     filterDiscoverRecipes(recipes, { query: 'water spinach' }),
   )
+  const inasal = recipes.find((recipe) => recipe.id === 'chicken-inasal')
+  const chickenResults = filterDiscoverRecipes(recipes, { query: 'chicken' })
+  assert.ok(chickenResults.includes(inasal))
+  assert.deepEqual(filterDiscoverRecipes(recipes, { query: 'manok' }), chickenResults.filter((recipe) => recipe !== inasal))
 })
 
 test('search treats special characters literally and handles no results', () => {
@@ -76,7 +80,7 @@ test('search matches either name or ingredient and combines with all other filte
 test('options derive from the full catalog without duplicate or unsupported values', () => {
   assert.deepEqual(getDiscoverFilterOptions(recipes), {
     cuisines: ['Filipino'],
-    difficulties: ['Easy', 'Medium'],
+    difficulties: ['Easy', 'Medium', 'Hard'],
   })
   const copy = [
     { cuisine: 'Vietnamese', difficulty: 'Hard' },

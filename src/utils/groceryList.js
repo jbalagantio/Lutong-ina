@@ -13,17 +13,27 @@ export const groceryStorageWarnings = {
 export const groceryUnsavedWarning = 'Changes are only in memory and may be lost on refresh.'
 
 const ingredientsByCategory = {
-  Meat: ['beef sirloin', 'chicken', 'pork belly', 'pork liver', 'pork ribs', 'pork shoulder'],
+  Meat: [
+    'beef sirloin', 'chicken', 'pork belly', 'pork liver', 'pork ribs', 'pork shoulder',
+    'beef chuck', 'bone-in beef shank', 'chicken leg quarters', 'ground pork', 'oxtail', 'pork ears',
+  ],
+  Seafood: ['milkfish', 'shrimp', 'tilapia'],
   Vegetables: [
     'bitter melon', 'cabbage', 'carrot', 'eggplant', 'garlic', 'ginger', 'long beans', 'moringa leaves',
     'pechay', 'potato', 'radish', 'red bell pepper', 'red onion', 'squash', 'tomato', 'water spinach', 'yellow onion',
+    'corn on the cob', 'dried taro leaves', 'green peas', 'okra',
   ],
   Fruits: ['green papaya'],
-  'Grains and Staples': ['coconut milk', 'cooked rice', 'cooking oil', 'elbow macaroni', 'mung beans'],
+  'Grains and Staples': [
+    'coconut milk', 'cooked rice', 'cooking oil', 'elbow macaroni', 'mung beans',
+    'all-purpose flour', 'coconut cream', 'cornstarch', 'lumpia wrappers', 'rice flour', 'unsweetened peanut butter',
+  ],
   'Dairy and Eggs': ['egg', 'evaporated milk'],
   Seasonings: [
     'bay leaf', 'black peppercorns', 'calamansi juice', 'cane vinegar', 'fish sauce', 'ground black pepper',
     'salt', 'soy sauce', 'tamarind pulp', 'tomato sauce',
+    'annatto powder', 'brown sugar', 'green olives', 'lemongrass', 'liver spread', 'long green chili',
+    "red bird's eye chili", 'sauteed shrimp paste',
   ],
 }
 

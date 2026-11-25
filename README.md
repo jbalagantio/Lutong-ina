@@ -41,7 +41,7 @@ Open **My Dishes → Cooking History** to search name snapshots and remove indiv
 
 History stays in this browser under `lutong-ina-cooking-history`. A failed read can be retried, merging readable saved records with current-session events. Invalid or partial storage requires confirmed replacement. Unsaved events may be lost on refresh. Cooking records for new personal recipes stay in memory until My Dishes saves their resolved IDs successfully. A later history write failure appears as a general warning and does not change the confirmation for a previously saved event.
 
-The 15 built-in recipes include preparation, cooking order, approximate timings, and doneness cues. Tortang Talong allows 45 minutes for broiling, peeling, and frying in batches. Ingredient lists and personal recipes are preserved.
+The 30 built-in Filipino recipes include preparation, cooking order, approximate timings, and doneness cues. Recipes without a sourced photo use the existing cooking-pot placeholder. V1 runs as a standalone React app with browser-local storage. AI integration, a backend, accounts, and cloud sync are deferred to V2.
 
 Choose one of three cooking modes on **Home**:
 

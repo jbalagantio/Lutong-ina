@@ -62,14 +62,38 @@ const expectedAliases = [
   ['water', ['tubig']],
   ['water spinach', ['kangkong']],
   ['yellow onion', ['yellow onions']],
+  ['all-purpose flour', ['all purpose flour', 'ap flour']],
+  ['annatto powder', ['atsuete powder', 'achiote powder']],
+  ['bone-in beef shank', ['bone-in beef shanks', 'beef shank with bone']],
+  ['brown sugar', ['asukal na pula']],
+  ['chicken leg quarters', ['chicken leg quarter']],
+  ['coconut cream', ['kakang gata']],
+  ['corn on the cob', ['whole corn cob', 'whole corn cobs']],
+  ['cornstarch', ['corn starch']],
+  ['dried taro leaves', ['dried gabi leaves', 'pinatuyong dahon ng gabi']],
+  ['green olives', ['green olive']],
+  ['green peas', ['green pea']],
+  ['ground pork', ['minced pork', 'giniling na baboy']],
+  ['lemongrass', ['tanglad', 'lemon grass']],
+  ['long green chili', ['siling haba na berde', 'long green chilli']],
+  ['lumpia wrappers', ['lumpia wrapper', 'balat ng lumpia']],
+  ['milkfish', ['bangus', 'milk fish']],
+  ['okra', ['lady\'s fingers']],
+  ['oxtail', ['beef oxtail', 'buntot ng baka']],
+  ['pork ears', ['pork ear', 'tainga ng baboy']],
+  ['red bird\'s eye chili', ['red bird\'s-eye chilli', 'pulang siling labuyo']],
+  ['rice flour', ['harina ng bigas']],
+  ['sauteed shrimp paste', ['sautéed shrimp paste', 'ginisang bagoong alamang']],
+  ['shrimp', ['shrimps', 'hipon']],
+  ['tilapia', ['tilapias']],
 ]
 
 test('every catalog name is canonical and every explicit alias resolves directly to it', () => {
   const catalogNames = new Set(recipes.flatMap((recipe) =>
     recipe.ingredients.map((ingredient) => normalizeIngredientName(ingredient.name)),
   ))
-  assert.equal(recipes.length, 15)
-  assert.equal(catalogNames.size, 42)
+  assert.equal(recipes.length, 30)
+  assert.equal(catalogNames.size, 69)
 
   for (const name of catalogNames) {
     assert.equal(getIngredientMatchName(name), name)
