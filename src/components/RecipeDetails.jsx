@@ -1,6 +1,6 @@
 import { getRecipeIngredientStatuses } from '../utils/discover.js'
 import IngredientCoverage from './IngredientCoverage.jsx'
-import RecipeImage from './RecipeImage.jsx'
+import RecipeGallery from './RecipeGallery.jsx'
 import RecipePreferences from './RecipePreferences.jsx'
 
 const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved, onTogglePreference, recipeActions }) => {
@@ -30,7 +30,7 @@ const RecipeDetails = ({ recipe, match, headingRef, libraryEntry, onToggleSaved,
             </div>
           )}
         </header>
-        <RecipeImage recipe={recipe} eager showCredit />
+        <RecipeGallery key={recipe.id} recipe={recipe} eager />
       </div>
       <div className="recipe-detail-body">
         <section aria-labelledby="recipe-detail-ingredients">

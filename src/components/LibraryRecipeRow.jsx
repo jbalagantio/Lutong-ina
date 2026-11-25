@@ -1,4 +1,5 @@
 import RecipeImage, { RecipeImageCredit } from './RecipeImage.jsx'
+import RecipeGallery from './RecipeGallery.jsx'
 import { recipeImages } from '../data/recipeImages.js'
 
 const LibraryRecipeRow = ({ recipe, isExpanded, onToggleDetails, recipeActions, children }) => (
@@ -31,7 +32,9 @@ const LibraryRecipeRow = ({ recipe, isExpanded, onToggleDetails, recipeActions, 
     </div>
     {isExpanded && (
       <div className="personal-recipe-details" id="personal-recipe-details">
-        <RecipeImageCredit image={recipeImages[recipe.id]} />
+        {recipeImages[recipe.id]?.gallery?.length > 0
+          ? <RecipeGallery recipe={recipe} />
+          : <RecipeImageCredit image={recipeImages[recipe.id]} />}
         <p className="recipe-cuisine">{recipe.cuisine}</p>
         {recipe.description && <p>{recipe.description}</p>}
         <h3>Ingredients</h3>

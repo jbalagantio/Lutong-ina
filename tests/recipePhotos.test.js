@@ -8,13 +8,21 @@ import { getOrphanedPhotoIds, getPhotoFileError, getPhotoType, getUnusedPhotoIds
 
 test('external photos have HTTPS sources and credits and remain optional', () => {
   const recipeIds = new Set(recipes.map((recipe) => recipe.id))
+  const photoSources = new Set()
   for (const [id, image] of Object.entries(recipeImages)) {
     assert.ok(recipeIds.has(id), id)
-    for (const link of [image.url, image.sourceUrl, image.licenseUrl]) {
-      assert.equal(new URL(link).protocol, 'https:')
+    const photos = [image, ...(image.gallery ?? [])]
+    assert.ok(photos.length <= 3, id)
+    for (const photo of photos) {
+      for (const link of [photo.url, photo.thumbnailUrl, photo.sourceUrl, photo.licenseUrl]) {
+        assert.equal(new URL(link).protocol, 'https:', id)
+      }
+      assert.ok(photo.alt && photo.creator && photo.title && photo.license, id)
+      assert.ok(!photoSources.has(photo.sourceUrl), photo.sourceUrl)
+      photoSources.add(photo.sourceUrl)
     }
-    assert.ok(image.alt && image.creator && image.title && image.license)
   }
+  assert.ok(Object.values(recipeImages).some((image) => image.gallery?.length > 0))
   assert.equal(recipeImages['personal-without-a-photo'], undefined)
 })
 

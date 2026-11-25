@@ -37,7 +37,10 @@ test('ingredient search uses partial English names and Filipino and English syno
   const inasal = recipes.find((recipe) => recipe.id === 'chicken-inasal')
   const chickenResults = filterDiscoverRecipes(recipes, { query: 'chicken' })
   assert.ok(chickenResults.includes(inasal))
-  assert.deepEqual(filterDiscoverRecipes(recipes, { query: 'manok' }), chickenResults.filter((recipe) => recipe !== inasal))
+  assert.deepEqual(filterDiscoverRecipes(recipes, { query: 'manok' }), chickenResults)
+  assert.ok(filterDiscoverRecipes(recipes, { query: 'mano' }).includes(inasal))
+  const [match] = getRecipeMatches([inasal], [{ name: 'Manok', isAvailable: true }])
+  assert.equal(match.matchedCount, 0)
 })
 
 test('search treats special characters literally and handles no results', () => {

@@ -1036,6 +1036,38 @@ h1 {
   margin-bottom: 0;
 }
 
+.recipe-gallery {
+  min-width: 0;
+}
+
+.recipe-gallery-thumbnails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+}
+
+.recipe-gallery-thumbnail {
+  padding: 2px;
+  border: 1px solid var(--control-border);
+  border-radius: 0.65rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.recipe-gallery-thumbnail[aria-pressed='true'] {
+  border: 2px solid var(--orange);
+  padding: 1px;
+}
+
+.recipe-gallery-thumbnail .recipe-photo-thumbnail {
+  width: 3.5rem;
+}
+
+.personal-recipe-details .recipe-gallery {
+  max-width: 34rem;
+}
+
 .recipe-detail-body {
   margin-top: 1.75rem;
 }

@@ -1,6 +1,17 @@
 import { recipeDifficulties } from './myDishes.js'
 import { getIngredientMatchName, matchesIngredientSearch, normalizeIngredientName } from './pantry.js'
 
+// These parent terms broaden Discover only. Pantry still matches the specific ingredient.
+const ingredientSearchParents = new Map([
+  ['chicken leg quarters', 'chicken'],
+])
+
+const matchesDiscoverIngredient = (name, searchTerm) => {
+  if (matchesIngredientSearch(name, searchTerm)) return true
+  const parent = ingredientSearchParents.get(getIngredientMatchName(name))
+  return Boolean(parent && matchesIngredientSearch(parent, searchTerm))
+}
+
 export const getDiscoverFilterOptions = (recipes) => {
   const cuisines = [...new Set(recipes.map((recipe) => recipe.cuisine))]
   cuisines.sort((first, second) => first.localeCompare(second, 'en'))
@@ -20,7 +31,7 @@ export const filterDiscoverRecipes = (recipes, { query = '', cuisine = '', maxTi
 
     return !searchTerm ||
       normalizeIngredientName(recipe.name).includes(searchTerm) ||
-      recipe.ingredients.some((ingredient) => matchesIngredientSearch(ingredient.name, searchTerm))
+      recipe.ingredients.some((ingredient) => matchesDiscoverIngredient(ingredient.name, searchTerm))
   }).sort((first, second) => first.name.localeCompare(second.name, 'en'))
 }
 

@@ -21,7 +21,7 @@ test('the built-in catalog keeps its recipe identities, valid instructions, and 
   assert.equal(recipes.length, 30)
   assert.equal(new Set(recipes.map((recipe) => recipe.id)).size, 30)
   assert.deepEqual(recipes.map((recipe) => recipe.id), [...expectedIds, ...newIds])
-  assert.deepEqual(Object.keys(recipeImages).sort(), [...expectedIds].sort())
+  assert.deepEqual(Object.keys(recipeImages).sort(), [...expectedIds, ...newIds].sort())
   for (const recipe of recipes) {
     assert.equal(validatePersonalRecipe(recipe).error, undefined, recipe.id)
     assert.ok(recipe.instructions.length > 0, recipe.id)
